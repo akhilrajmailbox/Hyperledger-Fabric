@@ -27,6 +27,8 @@ function Helm_Configure() {
     kubectl create clusterrolebinding tiller-cluster-rule --clusterrole=cluster-admin --serviceaccount=kube-system:tiller
     kubectl patch deploy --namespace kube-system tiller-deploy -p '{"spec":{"template":{"spec":{"serviceAccount":"tiller"}}}}'      
     helm init --service-account tiller --upgrade
+    sleep 10
+    helm repo add ar-repo https://akhilrajmailbox.github.io/Hyperledger-Fabric/docs
 }
 
 
@@ -35,7 +37,7 @@ function Helm_Configure() {
 function Storageclass_Configure() {
     Cloud_Provider
     echo "Configuring custom Fast storage class for the deployment...!"
-    if [[ ${CLOUD_PROVIDER} == "AWS" ]] ; then
+    if [[ ${CLOUD_PROVIDER} == "AWS" ]] ; then 
         echo "Configuring fast storageclass on ${CLOUD_PROVIDER}"
     elif [[ ${CLOUD_PROVIDER} == "Azure" ]] ; then
         echo "Configuring fast storageclass on ${CLOUD_PROVIDER}"
@@ -47,7 +49,35 @@ function Storageclass_Configure() {
     if kubectl get storageclass | grep fast >/dev/null ; then
         echo "fast storageclass already available on your K8s Cluster"
     else
-        kubectl create -f ${PROD_DIR}/extra/${CLOUD_PROVIDER}-storageclass.yaml
+        kubectl apply -f ${PROD_DIR}/extra/Storage/${CLOUD_PROVIDER}-storageclass.yaml
+    fi
+
+    if kubectl get storageclass | grep rwmany >/dev/null ; then
+        echo "rwmany storageclass already available on your K8s Cluster"
+    else
+        if [[ ${CLOUD_PROVIDER} == "AWS" ]] ; then
+            kubectl apply -f ${PROD_DIR}/extra/Storage/${CLOUD_PROVIDER}-efs-pvc-roles.yaml
+            kubectl apply -f ${PROD_DIR}/extra/Storage/${CLOUD_PROVIDER}-efs-provisioner-deployment.yml
+
+            export EFS_PROVISIONER_STATUS=""
+            until [[ ${EFS_PROVISIONER_STATUS} == "Running" ]] ; do
+                echo "Waiting for the EFS_PROVISIONER to start...!"
+                if [ "${EFS_PROVISIONER_STATUS}" == "Error" ]; then
+                    echo "There is an error in the Docker pod. Please check logs."
+                    exit 1
+                fi
+                sleep 2
+                export EFS_PROVISIONER_STATUS=$(kubectl get pods -n default -l "app=efs-provisioner"  --output=jsonpath={.items..status.phase})
+            done
+            echo "The EFS_PROVISIONER started and running...!"
+            kubectl apply -f ${PROD_DIR}/extra/Storage/${CLOUD_PROVIDER}-RWMany-storageclass.yaml
+        elif [[ ${CLOUD_PROVIDER} == "Azure" ]] ; then
+            kubectl apply -f ${PROD_DIR}/extra/Storage/${CLOUD_PROVIDER}-file-pvc-roles.yaml
+            kubectl apply -f ${PROD_DIR}/extra/Storage/${CLOUD_PROVIDER}-RWMany-storageclass.yaml
+        else
+            echo "CLOUD_PROVIDER not found..!, task aborting..!"
+            exit 1
+        fi
     fi
 }
 
@@ -71,6 +101,10 @@ function Pod_Status_Wait() {
         Pod_Status=""
         until [[ ${Pod_Status} == "true" ]] ; do
             echo "Waiting for the pod : ${i} to start...!"
+            if [ "${Pod_Status}" == "false" ]; then
+                echo "There is an error in the Docker pod. Please check logs."
+                exit 1
+            fi
             sleep 2
             export Pod_Status=$(kubectl ${namespace_options} get pods ${i} -o jsonpath="{.status.containerStatuses[0].ready}")
         done
@@ -467,9 +501,20 @@ function Orderer_Conf() {
 
 
 #######################################
+## Docker in Docker
+function Dind_Configure() {
+    echo "Configure Dind server for the deployment...!"
+    Setup_Namespace peers
+    helm install ar-repo/dind -n dindserver ${namespace_options} -f ${PROD_DIR}/helm_values/dind.yaml
+    DIND_POD=$(kubectl ${namespace_options} get pods -l "app=dind" -o jsonpath="{.items[0].metadata.name}")
+    Pod_Status_Wait ${DIND_POD}
+}
+
+
+#######################################
 ## Fabric Peer nodes Creation
 function Peer_Conf() {
-
+    Dind_Configure
     Choose_Env org_number
     Choose_Env peer_number
     if [[ -d ${PROD_DIR}/config/peer${PEER_NUM}-org${ORG_NUM}_MSP ]] ; then

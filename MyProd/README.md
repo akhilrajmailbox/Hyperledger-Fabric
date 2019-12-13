@@ -44,6 +44,18 @@ kubectl get challenge
 kubectl describe challenge X
 ```
 
+**WARNING : Change the following files**
+
+* configtx.yml
+* ca.yaml
+    * hosts
+    * externalDatabase
+    * config
+* efs-provisioner-deployment.yml
+    * file.system.id
+    * aws.region
+    * server
+
 
 ## K8s Deployment
 
