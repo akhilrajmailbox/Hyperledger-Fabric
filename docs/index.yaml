@@ -1,11 +1,25 @@
 apiVersion: v1
 entries:
+  dind:
+  - apiVersion: v1
+    appVersion: stable-dind
+    created: 2019-12-13T15:09:49.68348064+05:30
+    description: DinD Deployment chart
+    digest: 456b5778d2615e5e95f82b1a9db7834419065a948276752de09fe1b61b5e1795
+    keywords:
+    - dind
+    - Kubernetes
+    - chaincode
+    name: dind
+    urls:
+    - https://akhilrajmailbox.github.io/Hyperledger-Fabric/docs/dind-0.1.0.tgz
+    version: 0.1.0
   hlf-ca:
   - apiVersion: v1
     appVersion: 1.4.3
-    created: 2019-12-13T11:14:56.555870268+05:30
+    created: 2019-12-13T15:09:49.686175028+05:30
     description: Hyperledger Fabric Certificate Authority chart
-    digest: 987534b9e2b7c5a2c68a457a564fbaa1ca79730cfd9fb5d0f6a93d1c98219f2e
+    digest: ef704d34d89a522e35671f7727b557d01ef5e03766a55d4c07ec2af14a62ceea
     keywords:
     - blockchain
     - hyperledger
@@ -14,4 +28,33 @@ entries:
     urls:
     - https://akhilrajmailbox.github.io/Hyperledger-Fabric/docs/hlf-ca-0.1.0.tgz
     version: 0.1.0
-generated: 2019-12-13T11:14:56.551733338+05:30
+  hlf-couchdb:
+  - apiVersion: v1
+    appVersion: 0.4.10
+    created: 2019-12-13T15:09:49.687033031+05:30
+    description: CouchDB instance for Hyperledger Fabric
+    digest: 39dd4302e350a350edb31e37164498f45be14206c843472b92d3fc7e32200567
+    keywords:
+    - blockchain
+    - hyperledger
+    - fabric
+    - couchdb
+    name: hlf-couchdb
+    urls:
+    - https://akhilrajmailbox.github.io/Hyperledger-Fabric/docs/hlf-couchdb-0.1.0.tgz
+    version: 0.1.0
+  hlf-ord:
+  - apiVersion: v1
+    appVersion: 1.4.3
+    created: 2019-12-13T15:09:49.687827186+05:30
+    description: Hyperledger Fabric Orderer chart
+    digest: ea0b3e6dd40ed48fa6991e077479d614f9dc7d9f86b5c8bfcfcf53362c8d69d4
+    keywords:
+    - blockchain
+    - hyperledger
+    - fabric
+    name: hlf-ord
+    urls:
+    - https://akhilrajmailbox.github.io/Hyperledger-Fabric/docs/hlf-ord-0.1.0.tgz
+    version: 0.1.0
+generated: 2019-12-13T15:09:49.681010666+05:30

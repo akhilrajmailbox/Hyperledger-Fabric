@@ -1,0 +1,43 @@
+#https://hostadvice.com/how-to/how-to-use-ftp-to-transfer-files-between-servers-and-local-machines/
+#https://www.hostmysite.com/support/upload/browser-ftp/
+#https://www.tecmint.com/install-ftp-server-in-ubuntu/
+---
+apiVersion: apps/v1beta1
+kind: Deployment
+metadata:
+  name: chaincodeftp
+  labels:
+    component: chaincodeftp
+    role: ftpserver
+spec:
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        component: chaincodeftp
+        role: ftpserver
+    spec:
+      containers:
+      - name: chaincodeftp
+        imagePullPolicy: Always
+        image: akhilrajmailbox/ubuntu:16.04
+        env:
+        - name: NAMESPACE
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.namespace
+        resources:
+          requests:
+            memory: "1Gi"
+            cpu: 100m
+          limits:
+            memory: "2Gi"
+            cpu: 2
+        volumeMounts:
+        - mountPath: /shared
+          name: sharedvolume
+      restartPolicy: Always
+      volumes:
+      - name: sharedvolume
+        persistentVolumeClaim:
+          claimName: shared-pvc

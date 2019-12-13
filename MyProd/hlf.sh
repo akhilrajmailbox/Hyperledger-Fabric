@@ -85,15 +85,15 @@ function Cert_Manager_Configure() {
     echo "CA Mager Configuration...!"
     Setup_Namespace cert-manager
 
-    # kubectl apply -f ${PROD_DIR}/extra/CRDs.yaml
+    # kubectl apply -f ${PROD_DIR}/extra/CertManager/CRDs.yaml
     kubectl apply --validate=false -f https://raw.githubusercontent.com/jetstack/cert-manager/release-0.12/deploy/manifests/00-crds.yaml
     helm repo add jetstack https://charts.jetstack.io
     sleep 3
     # helm install stable/cert-manager -n cert-manager ${namespace_options}
     helm install jetstack/cert-manager -n cert-manager ${namespace_options}
     Pod_Status_Wait
-    kubectl apply -f ${PROD_DIR}/extra/certManagerCI_staging.yaml
-    kubectl apply -f ${PROD_DIR}/extra/certManagerCI_production.yaml
+    kubectl apply -f ${PROD_DIR}/extra/CertManager/certManagerCI_staging.yaml
+    kubectl apply -f ${PROD_DIR}/extra/CertManager/certManagerCI_production.yaml
 }
 
 

@@ -1,0 +1,6 @@
+#https://medium.com/@while1eq1/using-amazon-efs-in-a-multiaz-kubernetes-setup-57922e032776
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: rwmany
+provisioner: example.com/aws-efs

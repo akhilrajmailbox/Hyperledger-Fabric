@@ -1,0 +1,10 @@
+apiVersion: v1
+description: CouchDB instance for Hyperledger Fabric
+name: hlf-couchdb
+version: 0.1.0
+appVersion: 0.4.10
+keywords:
+  - blockchain
+  - hyperledger
+  - fabric
+  - couchdb

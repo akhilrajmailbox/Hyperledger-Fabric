@@ -1,0 +1,72 @@
+apiVersion: extensions/v1beta1
+kind: Deployment
+metadata:
+  name: {{ include "dind.fullname" . }}
+  labels:
+{{ include "labels.standard" . | indent 4 }}
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      app: {{ include "dind.name" . }}
+      release: {{ .Release.Name }}
+  strategy:
+    rollingUpdate:
+      maxUnavailable: 1
+  template:
+    metadata:
+      labels:
+{{ include "labels.standard" . | indent 8 }}
+    spec:
+      volumes:
+      - name: dockervolume
+        {{- if .Values.persistence.enabled }}
+        persistentVolumeClaim:
+          claimName: {{ .Values.persistence.existingClaim | default (include "dind.fullname" .) }}
+        {{- else }}
+          emptyDir: {}
+        {{- end }}
+      containers:
+        - name: dind
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          env:
+          {{- if .Values.tls.enabled}}
+          - name: DOCKER_TLS_CERTDIR
+            value : "true"
+          {{- else }}
+          - name: DOCKER_TLS_CERTDIR
+            value : "false"
+          {{- end }}
+          securityContext:
+            privileged: true
+          ports:
+            - containerPort: 2375
+          livenessProbe:
+            httpGet:
+              path: /
+              port: 2375
+            initialDelaySeconds: 5
+            periodSeconds: 5
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 2375
+            initialDelaySeconds: 15
+          volumeMounts:
+          - mountPath: /var/lib/docker
+            name: dockervolume
+          resources:
+{{ toYaml .Values.resources | indent 12 }}
+    {{- with .Values.nodeSelector }}
+      nodeSelector:
+{{ toYaml . | indent 8 }}
+    {{- end }}
+    {{- with .Values.affinity }}
+      affinity:
+{{ toYaml . | indent 8 }}
+    {{- end }}
+    {{- with .Values.tolerations }}
+      tolerations:
+{{ toYaml . | indent 8 }}
+    {{- end }}
