@@ -6,3 +6,4 @@ custom_values
 *.tx
 *.block
 crypto-config
+*/charts
