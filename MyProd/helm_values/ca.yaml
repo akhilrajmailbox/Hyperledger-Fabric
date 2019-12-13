@@ -1,0 +1,66 @@
+image:
+  tag: 1.3.0
+
+ingress:
+  enabled: true
+  annotations:
+    kubernetes.io/ingress.class: nginx
+    cert-manager.io/cluster-issuer: "letsencrypt-production"
+  path: /
+  hosts:
+    # TODO: Change this to your Domain Name
+    - ca.hgf.example.com
+  tls:
+    - secretName: ca--tls
+      hosts:
+        # TODO: Change this to your Domain Name
+        - ca.hgf-test.example.com
+
+persistence:
+  accessMode: ReadWriteOnce
+  storageClass: fast
+  size: 5Gi
+
+caName: ca
+
+# postgresql:
+#   enabled: true
+
+# TODO: Change this to your MySQL/ PostgreSQL data
+externalDatabase:
+  type: mysql
+  host: hlf-mysql.adsfsdgvsde.us-east-2.rds.amazonaws.com
+  username: myuser
+  password: myPass
+  database: cadb
+  port: 3306
+
+
+config:
+  hlfToolsVersion: 1.3.0
+  csr:
+    names:
+      c: IN
+      st: Bangalore
+      l:
+      o: "Akhil:Raj"
+      ou: Blockchain
+  affiliations:
+    aidtech: []
+
+affinity:
+  podAntiAffinity:
+    preferredDuringSchedulingIgnoredDuringExecution:
+      - weight: 95
+        podAffinityTerm:
+          topologyKey: "kubernetes.io/hostname"
+          labelSelector:
+            matchLabels:
+              app: hlf-ca
+  # podAffinity:
+  #   requiredDuringSchedulingIgnoredDuringExecution:
+  #   - labelSelector:
+  #       matchLabels:
+  #         app: postgresql
+  #         release: ca
+  #     topologyKey: "kubernetes.io/hostname"
