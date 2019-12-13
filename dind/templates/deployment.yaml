@@ -10,9 +10,6 @@ spec:
     matchLabels:
       app: {{ include "dind.name" . }}
       release: {{ .Release.Name }}
-  strategy:
-    rollingUpdate:
-      maxUnavailable: 1
   template:
     metadata:
       labels:
@@ -36,23 +33,23 @@ spec:
             value : "true"
           {{- else }}
           - name: DOCKER_TLS_CERTDIR
-            value : "false"
+            value : ""
           {{- end }}
           securityContext:
             privileged: true
           ports:
             - containerPort: 2375
-          livenessProbe:
-            httpGet:
-              path: /
-              port: 2375
-            initialDelaySeconds: 5
-            periodSeconds: 5
-          readinessProbe:
-            httpGet:
-              path: /
-              port: 2375
-            initialDelaySeconds: 15
+          # livenessProbe:
+          #   httpGet:
+          #     path: /
+          #     port: 2375
+          #   initialDelaySeconds: 5
+          #   periodSeconds: 5
+          # readinessProbe:
+          #   httpGet:
+          #     path: /
+          #     port: 2375
+          #   initialDelaySeconds: 15
           volumeMounts:
           - mountPath: /var/lib/docker
             name: dockervolume

@@ -8,7 +8,7 @@ image:
   pullPolicy: IfNotPresent
 
 tls:
-  enabled: false
+  enabled: ""
 
 service:
   # Cluster IP or LoadBalancer
