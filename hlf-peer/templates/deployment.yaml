@@ -152,10 +152,13 @@ spec:
               echo ">\033[0;35m peer node start \033[0m"
               peer node start
               env:
-                {{- if .Values.dind.enabled}}
                 # DinD Docker Deployment
+                {{- if .Values.dind.enabled}}
                 - name: CORE_VM_ENDPOINT
-                  value: http://docker:2375
+                  value: http://dindserver:2375
+                {{- else }}
+                - name: CORE_VM_ENDPOINT
+                  value: unix:///host/var/run/docker.sock
                 {{- end }}
               envFrom:
             {{- if eq .Values.peer.databaseType "CouchDB" }}
