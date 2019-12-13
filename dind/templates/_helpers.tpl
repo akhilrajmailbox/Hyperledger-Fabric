@@ -39,8 +39,8 @@ labels.standard prints the standard Helm labels.
 The standard labels are frequently used in metadata.
 */ -}}
 {{- define "labels.standard" -}}
-app: {{ include "hlf-ord.name" . }}
+app: {{ include "dind.name" . }}
 heritage: {{ .Release.Service | quote }}
 release: {{ .Release.Name | quote }}
-chart: {{ include "hlf-ord.chart" . }}
+chart: {{ include "dind.chart" . }}
 {{- end -}}

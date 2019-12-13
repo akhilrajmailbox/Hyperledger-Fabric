@@ -3,9 +3,9 @@ entries:
   dind:
   - apiVersion: v1
     appVersion: stable-dind
-    created: 2019-12-13T15:13:54.001747838+05:30
+    created: 2019-12-13T15:20:51.086806851+05:30
     description: DinD Deployment chart
-    digest: 456b5778d2615e5e95f82b1a9db7834419065a948276752de09fe1b61b5e1795
+    digest: b2ff68287e342fdd7ad68a995d31c858c4759f9d332d98486e21cd6dbb241557
     keywords:
     - dind
     - Kubernetes
@@ -17,7 +17,7 @@ entries:
   hlf-ca:
   - apiVersion: v1
     appVersion: 1.4.3
-    created: 2019-12-13T15:13:54.003982249+05:30
+    created: 2019-12-13T15:20:51.08914032+05:30
     description: Hyperledger Fabric Certificate Authority chart
     digest: ef704d34d89a522e35671f7727b557d01ef5e03766a55d4c07ec2af14a62ceea
     keywords:
@@ -31,7 +31,7 @@ entries:
   hlf-couchdb:
   - apiVersion: v1
     appVersion: 0.4.10
-    created: 2019-12-13T15:13:54.004981691+05:30
+    created: 2019-12-13T15:20:51.090099686+05:30
     description: CouchDB instance for Hyperledger Fabric
     digest: 39dd4302e350a350edb31e37164498f45be14206c843472b92d3fc7e32200567
     keywords:
@@ -46,7 +46,7 @@ entries:
   hlf-ord:
   - apiVersion: v1
     appVersion: 1.4.3
-    created: 2019-12-13T15:13:54.005999981+05:30
+    created: 2019-12-13T15:20:51.091228173+05:30
     description: Hyperledger Fabric Orderer chart
     digest: ea0b3e6dd40ed48fa6991e077479d614f9dc7d9f86b5c8bfcfcf53362c8d69d4
     keywords:
@@ -60,7 +60,7 @@ entries:
   hlf-peer:
   - apiVersion: v1
     appVersion: 1.4.3
-    created: 2019-12-13T15:13:54.007021437+05:30
+    created: 2019-12-13T15:20:51.092753124+05:30
     description: Hyperledger Fabric Peer chart
     digest: 76f6e842380d84e0d1a0d8a517f68d3d08f69344c12cd0659bdfd5dc796ba3fb
     keywords:
@@ -71,4 +71,4 @@ entries:
     urls:
     - https://akhilrajmailbox.github.io/Hyperledger-Fabric/docs/hlf-peer-0.1.0.tgz
     version: 0.1.0
-generated: 2019-12-13T15:13:53.999785731+05:30
+generated: 2019-12-13T15:20:51.085935848+05:30
