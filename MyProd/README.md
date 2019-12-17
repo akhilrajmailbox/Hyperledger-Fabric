@@ -36,6 +36,7 @@ which configtxlator
 
 ### Create your K8s Cluster on AWS / Azure (below example only for AWS)
 
+[install / upgrade eksctl](https://docs.aws.amazon.com/eks/latest/userguide/eksctl.html)
 
 ```
 eksctl create cluster \
@@ -50,7 +51,6 @@ eksctl create cluster \
     --nodes-max 5 \
     --managed
 ```
-
 
 [Configure Cert-manager with Let's Encrypt](https://cert-manager.io/docs/tutorials/acme/ingress/)
 
