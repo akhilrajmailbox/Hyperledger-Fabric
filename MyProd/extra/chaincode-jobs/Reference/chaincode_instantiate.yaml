@@ -34,18 +34,15 @@ spec:
           - -c
           - >
             peer chaincode instantiate -o ord1-hlf-ord.orderers.svc.cluster.local:7050 -C ${CHANNEL_NAME} -n ${CHAINCODE_NAME} -l ${LANGUAGE} -v ${CHAINCODE_VERSION} -c '{"Args":[]}' -P "AND ('Org1MSP.member','Org2MSP.member')"
-        envFrom:
-        - configMapRef:
-            name: chaincode-cm
         env:
-        # - name: CHANNEL_NAME
-        #   value: mychannel
-        # - name: LANGUAGE
-        #   value: "node"
-        # - name: CHAINCODE_NAME
-        #   value: "myccnew"
-        # - name: CHAINCODE_VERSION
-        #   value: "1.0.0"
+        - name: CHANNEL_NAME
+          value: mychannel
+        - name: LANGUAGE
+          value: "node"
+        - name: CHAINCODE_NAME
+          value: "mycc"
+        - name: CHAINCODE_VERSION
+          value: "1.0"
         - name: FABRIC_CFG_PATH
           value: /etc/hyperledger/fabric
         - name: CORE_PEER_MSPCONFIGPATH

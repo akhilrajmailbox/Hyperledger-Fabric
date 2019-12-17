@@ -1,9 +1,9 @@
 #!/bin/bash
 export PROD_DIR="./"
 
-if [[ ! -d ${PROD_DIR}/helm_values/custom_values ]] ; then
-    echo "Custom Helm Values Store Creating...!"
-    mkdir ${PROD_DIR}/helm_values/custom_values
+if [[ ! -d ${PROD_DIR}/config/MyConfig ]] ; then
+    echo "Custom Values Store Creating...!"
+    mkdir ${PROD_DIR}/config/MyConfig
 fi
 
 #######################################
@@ -13,9 +13,23 @@ function Cloud_Provider() {
     until [[ ${CLOUD_PROVIDER} == "AWS" ]] || [[ ${CLOUD_PROVIDER} == "Azure" ]] ; do
         echo "Enter Either AWS or Azure"
         read -r -p "Enter your Cloud Provider :: " CLOUD_PROVIDER </dev/tty
-        export CLOUD_PROVIDER=$CLOUD_PROVIDER
+        export CLOUD_PROVIDER=${CLOUD_PROVIDER}
     done
 }
+
+
+#######################################
+## Chaincode location finder
+function CC_Provider() {
+    export CC_LOCATION=""
+    until [[ -d ${CC_LOCATION} ]] ; do
+        echo "${CC_LOCATION} is not a directory"
+        echo -e "Go to Chaincode location in your local system and run : pwd to get the absolute path for your chaincode \n example : assuming that your chaincode is written in node and your code can found under directory called javascript \n Open another terminal and Go to javascript folder and then run pwd, copy the absolute path and run the same command again in order to configure your chaincode"
+        read -r -p "Enter your Chaincode location :: " CC_LOCATION </dev/tty
+        export CC_LOCATION=${CC_LOCATION}
+    done
+}
+
 
 #######################################
 ## helm and tiller
@@ -57,7 +71,7 @@ function Storageclass_Configure() {
     else
         if [[ ${CLOUD_PROVIDER} == "AWS" ]] ; then
             kubectl apply -f ${PROD_DIR}/extra/Storage/${CLOUD_PROVIDER}-efs-pvc-roles.yaml
-            kubectl apply -f ${PROD_DIR}/extra/Storage/${CLOUD_PROVIDER}-efs-provisioner-deployment.yml
+            kubectl apply -f ${PROD_DIR}/extra/Storage/${CLOUD_PROVIDER}-efs-provisioner-deployment.yaml
 
             export EFS_PROVISIONER_STATUS=""
             until [[ ${EFS_PROVISIONER_STATUS} == "Running" ]] ; do
@@ -80,6 +94,7 @@ function Storageclass_Configure() {
         fi
     fi
 }
+
 
 #######################################
 ## NGINX Ingress controller
@@ -114,20 +129,40 @@ function Pod_Status_Wait() {
 
 
 #######################################
+## Check job status
+function Job_Status_Wait() {
+    echo "Checking pod status on : ${namespace_options} for the job : ${1}"
+    JOBSTATUS=""
+    PODSTATUS=""
+    while [ "${JOBSTATUS}" != "1/1" ]; do
+        echo "Waiting for ${1} job to be completed"
+        sleep 1;
+        if [[ ${PODSTATUS} == "Error" ]]; then
+            echo "Job ${1} Failed"
+            exit 1
+        fi
+        JOBSTATUS=$(kubectl ${namespace_options} get jobs | grep ${1} | awk '{print $2}')
+        PODSTATUS=$(kubectl ${namespace_options} get pods --sort-by='{.metadata.creationTimestamp}' | grep ${1} | awk '{print $3}' | tail -1)
+    done
+    echo "job ${1} Completed Successfully"
+}
+
+
+#######################################
 ## Certificate manager
 function Cert_Manager_Configure() {
     echo "CA Mager Configuration...!"
     Setup_Namespace cert-manager
 
-    # kubectl apply -f ${PROD_DIR}/extra/CertManager/CRDs.yaml
+    # kubectl apply -f ${PROD_DIR}/extra/Cert-Manager/CRDs.yaml
     kubectl apply --validate=false -f https://raw.githubusercontent.com/jetstack/cert-manager/release-0.12/deploy/manifests/00-crds.yaml
     helm repo add jetstack https://charts.jetstack.io
     sleep 3
     # helm install stable/cert-manager -n cert-manager ${namespace_options}
     helm install jetstack/cert-manager -n cert-manager ${namespace_options}
     Pod_Status_Wait
-    kubectl apply -f ${PROD_DIR}/extra/CertManager/certManagerCI_staging.yaml
-    kubectl apply -f ${PROD_DIR}/extra/CertManager/certManagerCI_production.yaml
+    kubectl apply -f ${PROD_DIR}/extra/Cert-Manager/certManagerCI_staging.yaml
+    kubectl apply -f ${PROD_DIR}/extra/Cert-Manager/certManagerCI_production.yaml
 }
 
 
@@ -163,6 +198,34 @@ function Setup_Namespace() {
     else
         echo "User input for Setup_Namespace is mandatory"
     fi
+}
+
+
+#######################################
+## Docker in Docker
+function Dind_Configure() {
+    echo "Configure Dind server for the deployment...!"
+    Setup_Namespace peers
+    helm install ar-repo/dind -n dindserver ${namespace_options} -f ${PROD_DIR}/helm_values/dind.yaml
+    DIND_POD=$(kubectl ${namespace_options} get pods -l "app=dind" -o jsonpath="{.items[0].metadata.name}")
+    Pod_Status_Wait ${DIND_POD}
+}
+
+
+#######################################
+## Chaincode storage
+function CC_Storage_Configure() {
+    Cloud_Provider
+    echo "Configure Chaincode Storage on ${CLOUD_PROVIDER}...!"
+    Setup_Namespace peers
+    if $(kubectl get storageclass rwmany > /dev/null 2>&1) ; then
+        kubectl ${namespace_options} apply -f ${PROD_DIR}/extra/Storage/${CLOUD_PROVIDER}-chaincode-pvc.yaml
+    else
+        echo "storageclass : rwmany not found....!"
+        exit 1
+    fi
+    CC_STORAGE_POD=$(kubectl ${namespace_options} get pods -l "component=chaincodestorage,role=storage-server" -o jsonpath="{.items[0].metadata.name}")
+    Pod_Status_Wait ${CC_STORAGE_POD}
 }
 
 
@@ -483,8 +546,8 @@ function Orderer_Conf() {
             kubectl create secret generic ${namespace_options} hlf--ord${ORDERER_NUM}-idkey --from-file=key.pem=${NODE_KEY}
 
             ## Install orderers using helm
-            envsubst < ${PROD_DIR}/helm_values/ord.yaml > ${PROD_DIR}/helm_values/custom_values/ord${ORDERER_NUM}.yaml
-            helm install stable/hlf-ord -n ord${ORDERER_NUM} ${namespace_options} -f ${PROD_DIR}/helm_values/custom_values/ord${ORDERER_NUM}.yaml
+            envsubst < ${PROD_DIR}/helm_values/ord.yaml > ${PROD_DIR}/config/MyConfig/ord${ORDERER_NUM}.yaml
+            helm install stable/hlf-ord -n ord${ORDERER_NUM} ${namespace_options} -f ${PROD_DIR}/config/MyConfig/ord${ORDERER_NUM}.yaml
 
             ## Get logs from orderer to check it's actually started
             export ORD_POD=$(kubectl get pods ${namespace_options} -l "app=hlf-ord,release=ord${ORDERER_NUM}" -o jsonpath="{.items[0].metadata.name}")
@@ -501,20 +564,8 @@ function Orderer_Conf() {
 
 
 #######################################
-## Docker in Docker
-function Dind_Configure() {
-    echo "Configure Dind server for the deployment...!"
-    Setup_Namespace peers
-    helm install ar-repo/dind -n dindserver ${namespace_options} -f ${PROD_DIR}/helm_values/dind.yaml
-    DIND_POD=$(kubectl ${namespace_options} get pods -l "app=dind" -o jsonpath="{.items[0].metadata.name}")
-    Pod_Status_Wait ${DIND_POD}
-}
-
-
-#######################################
 ## Fabric Peer nodes Creation
 function Peer_Conf() {
-    Dind_Configure
     Choose_Env org_number
     Choose_Env peer_number
     if [[ -d ${PROD_DIR}/config/peer${PEER_NUM}-org${ORG_NUM}_MSP ]] ; then
@@ -538,8 +589,8 @@ function Peer_Conf() {
 
         ## Install CouchDB chart
         Setup_Namespace peers
-        envsubst < ${PROD_DIR}/helm_values/cdb-peer.yaml > ${PROD_DIR}/helm_values/custom_values/cdb-peer${PEER_NUM}-org${ORG_NUM}.yaml
-        helm install stable/hlf-couchdb -n cdb-peer${PEER_NUM}-org${ORG_NUM} ${namespace_options} -f ${PROD_DIR}/helm_values/custom_values/cdb-peer${PEER_NUM}-org${ORG_NUM}.yaml
+        envsubst < ${PROD_DIR}/helm_values/cdb-peer.yaml > ${PROD_DIR}/config/MyConfig/cdb-peer${PEER_NUM}-org${ORG_NUM}.yaml
+        helm install stable/hlf-couchdb -n cdb-peer${PEER_NUM}-org${ORG_NUM} ${namespace_options} -f ${PROD_DIR}/config/MyConfig/cdb-peer${PEER_NUM}-org${ORG_NUM}.yaml
 
         ## Check that CouchDB is running
         export CDB_POD=$(kubectl get pods ${namespace_options} -l "app=hlf-couchdb,release=cdb-peer${PEER_NUM}-org${ORG_NUM}" -o jsonpath="{.items[*].metadata.name}")
@@ -578,8 +629,8 @@ function Peer_Conf() {
             kubectl create secret generic ${namespace_options} hlf--peer${PEER_NUM}-org${ORG_NUM}-idkey --from-file=key.pem=${NODE_KEY}
 
             ## Install Peer using helm
-            envsubst < ${PROD_DIR}/helm_values/peer.yaml > ${PROD_DIR}/helm_values/custom_values/peer${PEER_NUM}-org${ORG_NUM}.yaml
-            helm install stable/hlf-peer -n peer${PEER_NUM}-org${ORG_NUM} ${namespace_options} -f ${PROD_DIR}/helm_values/custom_values/peer${PEER_NUM}-org${ORG_NUM}.yaml
+            envsubst < ${PROD_DIR}/helm_values/peer.yaml > ${PROD_DIR}/config/MyConfig/peer${PEER_NUM}-org${ORG_NUM}.yaml
+            helm install stable/hlf-peer -n peer${PEER_NUM}-org${ORG_NUM} ${namespace_options} -f ${PROD_DIR}/config/MyConfig/peer${PEER_NUM}-org${ORG_NUM}.yaml
 
             ## check that Peer is running
             export PEER_POD=$(kubectl get pods ${namespace_options} -l "app=hlf-peer,release=peer${PEER_NUM}-org${ORG_NUM}" -o jsonpath="{.items[0].metadata.name}")
@@ -656,6 +707,133 @@ function Join_Channel() {
 
 
 #######################################
+## Chaincode versioning
+function CC_Version() {
+    CC_Provider
+    Setup_Namespace peers
+    export CC_LOCATION_BASENAME=$(basename ${CC_LOCATION})
+    export PEER_NUM=1
+    export ORG_NUM=1
+
+    kubectl ${namespace_options} apply -f ${PROD_DIR}/extra/Chaincode-Jobs/chaincode-ConfigMap.yaml
+    CHAINCODE_NAME=$(kubectl ${namespace_options} get configmap chaincode-cm -o yaml | grep "CHAINCODE_NAME:" | awk '{print $2}')
+
+    if [[ -z ${CHAINCODE_NAME} ]] ; then
+        export CHAINCODE_NAME=mycc
+    fi
+    echo "Choosing CHAINCODE_NAME : ${CHAINCODE_NAME}"
+
+    ## Peer pod : org1 peer1
+    export PEER_POD=$(kubectl get pods ${namespace_options} -l "app=hlf-peer,release=peer${PEER_NUM}-org${ORG_NUM}" -o jsonpath="{.items[0].metadata.name}")
+    Pod_Status_Wait ${PEER_POD}
+
+    if echo "kubectl exec ${namespace_options} ${PEER_POD} -- bash -c 'CORE_PEER_MSPCONFIGPATH=\$ADMIN_MSP_PATH peer chaincode list --installed'" | bash | grep "${CHAINCODE_NAME}" ; then
+        echo -e "chaincode with name : ${CHAINCODE_NAME} installed...\n checking the version"
+        export CHAINCODE_OLD_VER=$(echo "kubectl exec ${namespace_options} ${PEER_POD} -- bash -c 'CORE_PEER_MSPCONFIGPATH=\$ADMIN_MSP_PATH peer chaincode list --installed'" | bash | grep "${CHAINCODE_NAME}" | tail -1 | grep "Version:" | awk '{print $4}' | cut -f1 -d",")
+        if [[ -z ${CHAINCODE_OLD_VER} ]] ; then
+            export CHAINCODE_VER_SET=false
+            echo "some issue while fetching the chaincode version"
+            exit 1
+        else
+            export CHAINCODE_VER_SET=update
+            echo "chaincode : ${CHAINCODE_NAME} with version : ${CHAINCODE_OLD_VER} found..!"
+        fi
+    else
+        export CHAINCODE_VER_SET=initial
+        echo -e "chaincode not found with name : ${CHAINCODE_NAME} one peer : ${PEER_POD} \n assuming that we are installing the chaincode at very first time...!"
+    fi
+
+    if [[ ${CHAINCODE_VER_SET} == "update" ]] ; then
+        ## DinD server
+        export DIND_POD=$(kubectl ${namespace_options} get pods -l "app=dind" -o jsonpath="{.items[0].metadata.name}")
+        Pod_Status_Wait ${DIND_POD}
+
+        echo "kubectl exec ${namespace_options} ${DIND_POD} -- sh -c 'rm -rf /tmp/VERSION && echo ${CHAINCODE_OLD_VER} > /tmp/VERSION'" | bash
+        CHAINCODE_NEW_VER=$(kubectl exec ${namespace_options} ${DIND_POD} -- sh -c 'docker run --rm -v /tmp/:/app akhilrajmailbox/bump PATCH &> /dev/null && cat /tmp/VERSION')
+        echo "Chaincode updating from verison : ${CHAINCODE_OLD_VER} to verison : ${CHAINCODE_NEW_VER}"
+        export CHAINCODE_VERSION=${CHAINCODE_NEW_VER}
+        ## envsubt
+
+    elif [[ ${CHAINCODE_VER_SET} == "initial" ]] ; then
+        echo "Installing chaincode with version 1.0.0"
+        export CHAINCODE_VERSION=1.0.0
+    else
+        echo "Chaincode version won't update manually...!" 
+    fi
+
+    if [[ ! -z ${CHAINCODE_VERSION} ]] ; then
+        echo "configuring configmap for the chaincode ver : ${CHAINCODE_VERSION}"
+        envsubst < ${PROD_DIR}/extra/Chaincode-Jobs/chaincode-ConfigMap.yaml
+        envsubst < ${PROD_DIR}/extra/Chaincode-Jobs/chaincode-ConfigMap.yaml > ${PROD_DIR}/config/MyConfig/chaincode-ConfigMap-${CHAINCODE_VERSION}.yaml
+        kubectl ${namespace_options} apply -f ${PROD_DIR}/config/MyConfig/chaincode-ConfigMap-${CHAINCODE_VERSION}.yaml
+    else
+        echo "CHAINCODE_VERSION can't be empty...!"
+        exit 1
+    fi
+}
+
+
+#######################################
+## Chaincode install
+function CC_Install() {
+    Setup_Namespace peers
+
+    ## Configuring Shared storage server for chaincode
+    kubectl ${namespace_options} apply -f ${PROD_DIR}/extra/Chaincode-Jobs/chaincode_storage.yaml
+    CC_STORAGE_POD=$(kubectl ${namespace_options} get pods -l "component=chaincodestorage,role=storage-server" -o jsonpath="{.items[0].metadata.name}")
+    Pod_Status_Wait ${CC_STORAGE_POD}
+
+    ## checking DinD server
+    export DIND_POD=$(kubectl ${namespace_options} get pods -l "app=dind" -o jsonpath="{.items[0].metadata.name}")
+    Pod_Status_Wait ${DIND_POD}
+
+    if kubectl exec ${namespace_options} ${CC_STORAGE_POD} -- ls /shared/${CC_LOCATION_BASENAME} ; then
+        echo "${CC_LOCATION_BASENAME} already available in the network, backing up in remote system...!"
+        kubectl exec ${namespace_options} ${CC_STORAGE_POD} -- mv /shared/${CC_LOCATION_BASENAME} /shared/${CC_LOCATION_BASENAME}-$(date +%F-%H-%M-%S)
+    fi
+    echo -e "\nCopying chaincode from local to remote system"
+    kubectl cp ${namespace_options} ${CC_LOCATION} ${CC_STORAGE_POD}:/shared/
+
+    echo -e "\nCreating installchaincode job"
+    if kubectl exec ${namespace_options} ${CC_STORAGE_POD} -- ls /shared/${CC_LOCATION_BASENAME} ; then
+        if kubectl ${namespace_options} get jobs | grep chaincodeinstall > /dev/null 2>&1 ; then
+            kubectl ${namespace_options} delete jobs chaincodeinstall
+        fi
+        kubectl ${namespace_options} apply -f ${PROD_DIR}/extra/Chaincode-Jobs/chaincode_install.yaml
+        Job_Status_Wait chaincodeinstall
+    else
+        echo -e "task aborthing \n Location : /shared/${CC_LOCATION_BASENAME} not found"
+        exit 1
+    fi
+}
+
+
+#######################################
+## Chaincode instantiate / upgrade
+function CC_Deploy() {
+    Setup_Namespace peers
+    if [[ ${CHAINCODE_VER_SET} == "initial" ]] ; then
+        echo -e "\nCreating chaincodeinstantiate job"
+        if kubectl ${namespace_options} get jobs | grep chaincodeinstantiate > /dev/null 2>&1 ; then
+            kubectl ${namespace_options} delete jobs chaincodeinstantiate
+        fi
+        kubectl ${namespace_options} apply -f ${PROD_DIR}/extra/Chaincode-Jobs/chaincode_instantiate.yaml
+        Job_Status_Wait chaincodeinstantiate
+    elif [[ ${CHAINCODE_VER_SET} == "update" ]] ; then
+        echo -e "\nCreating chaincodeupgrade job"
+        if kubectl ${namespace_options} get jobs | grep chaincodeupgrade > /dev/null 2>&1 ; then
+            kubectl ${namespace_options} delete jobs chaincodeupgrade
+        fi
+        kubectl ${namespace_options} apply -f ${PROD_DIR}/extra/Chaincode-Jobs/chaincode_upgrade.yaml
+        Job_Status_Wait chaincodeupgrade
+    else
+        echo "CHAINCODE_VER_SET is empty...!"
+        exit 1
+    fi
+}
+
+
+#######################################
 ## List channel
 function List_Channel() {
     Setup_Namespace peers
@@ -666,6 +844,46 @@ function List_Channel() {
     echo "List Channels which peer : peer${PEER_NUM}-org${ORG_NUM} has joined...!"
     kubectl exec ${PEER_POD} ${namespace_options} -- peer channel list
 }
+
+
+#######################################
+## List Chaincode Install
+function List_Chaincode_Install() {
+    Setup_Namespace peers
+    Choose_Env org_number
+    Choose_Env peer_number
+    
+    export PEER_POD=$(kubectl get pods ${namespace_options} -l "app=hlf-peer,release=peer${PEER_NUM}-org${ORG_NUM}" -o jsonpath="{.items[0].metadata.name}")
+    echo "List chaincode which installed on peer : peer${PEER_NUM}-org${ORG_NUM}"
+    echo "kubectl exec ${namespace_options} ${PEER_POD} -- bash -c 'CORE_PEER_MSPCONFIGPATH=\$ADMIN_MSP_PATH peer chaincode list --installed'" | bash
+}
+
+
+#######################################
+## List Chaincode Instantiate
+function List_Chaincode_Instantiate() {
+    Setup_Namespace peers
+    Choose_Env org_number
+    Choose_Env peer_number
+    Choose_Env channel_name
+
+    export PEER_POD=$(kubectl get pods ${namespace_options} -l "app=hlf-peer,release=peer${PEER_NUM}-org${ORG_NUM}" -o jsonpath="{.items[0].metadata.name}")
+    if kubectl exec ${PEER_POD} ${namespace_options} -- peer channel list | grep ${CHANNEL_NAME} ; then
+        echo "List chaincode which instantiated on peer : peer${PEER_NUM}-org${ORG_NUM} per on channel : ${CHANNEL_NAME}...!"
+        echo "kubectl exec ${namespace_options} ${PEER_POD} -- bash -c 'CORE_PEER_MSPCONFIGPATH=\$ADMIN_MSP_PATH peer chaincode list --instantiated -C ${CHANNEL_NAME}'" | bash
+    else
+        echo -e "channel : ${CHANNEL_NAME} not found on peer : ${PEER_POD} \n Please check the channel name or run channel-ls to list the channel...!"
+        exit 1
+    fi
+}
+
+
+
+
+
+
+
+
 
 
 
@@ -686,41 +904,39 @@ if [[ $option = initial ]]; then
     Storageclass_Configure
     Nginx_Configure
     Setup_Namespace create
-    echo "sleeping for 2 sec" ; sleep 2
+    Dind_Configure
+    CC_Storage_Configure
 elif [[ $option = cert-manager ]]; then
     Cert_Manager_Configure
-    echo "sleeping for 2 sec" ; sleep 2
 elif [[ $option = fabric-ca ]]; then
     echo "Configure CA Domain Name in file /helm_values/ca.yaml"
     Fabric_CA_Configure
-    echo "sleeping for 2 sec" ; sleep 2
 elif [[ $option = org-orderer-admin ]]; then
     Orgadmin_Orderer_Configure
-    echo "sleeping for 2 sec" ; sleep 2
 elif [[ $option = org-peer-admin ]]; then
     Orgadmin_Peer_Configure
-    echo "sleeping for 2 sec" ; sleep 2
 elif [[ $option = genesis-block ]]; then
     Genesis_Create
-    echo "sleeping for 2 sec" ; sleep 2
 elif [[ $option = channel-block ]]; then
     Channel_Create
-    echo "sleeping for 2 sec" ; sleep 2
 elif [[ $option = orderer-create ]]; then
     Orderer_Conf
-    echo "sleeping for 2 sec" ; sleep 2
 elif [[ $option = peer-create ]]; then
     Peer_Conf
-    echo "sleeping for 2 sec" ; sleep 2
 elif [[ $option = channel-create ]]; then
     Create_Channel_On_Peer
-    echo "sleeping for 2 sec" ; sleep 2
 elif [[ $option = channel-join ]]; then
     Join_Channel
-    echo "sleeping for 2 sec" ; sleep 2
+elif [[ $option = cc-deploy ]]; then
+    CC_Version
+    CC_Install
+    CC_Deploy
 elif [[ $option = channel-ls ]]; then
     List_Channel
-    echo "sleeping for 2 sec" ; sleep 2
+elif [[ $option = cc-install-ls ]]; then
+    List_Chaincode_Install
+elif [[ $option = cc-instantiate-ls ]]; then
+    List_Chaincode_Instantiate
 else
 	echo "$Command_Usage"
 cat << EOF
@@ -739,7 +955,10 @@ orderer-create      :   Create the Orderers certs and configure it in the K8s se
 peer-create         :   Create the Orderers certs and configure it in the K8s secrets, Deploying the Peers nodes on namespace peers
 channel-create      :   One time configuraiton on first peer (peer-org1-1 / peer-org2-1) on each organisation ; Creating the channel in one peer
 channel-join        :   Join to the channel which we created before
+cc-deploy           :   Install / Instantiate / Upgrade chaincode
 channel-ls          :   List all channels which a particular peer has joined
+cc-install-ls       :   List chaincode which installed on a particular peer
+cc-instantiate-ls   :   List chaincode which instantiated on a particular peer per channel
 
 _-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_
 EOF

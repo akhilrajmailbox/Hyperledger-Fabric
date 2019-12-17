@@ -55,16 +55,13 @@ spec:
             cp -r /shared/javascript $GOPATH/src/github.com/chaincode/loyalty_point/ ;
             ls $GOPATH/src/github.com/chaincode/loyalty_point/javascript/ ;
             peer chaincode install -n ${CHAINCODE_NAME} -l ${LANGUAGE} -v ${CHAINCODE_VERSION} -p /opt/gopath/src/github.com/chaincode/loyalty_point/javascript/
-        envFrom:
-        - configMapRef:
-            name: chaincode-cm
         env:
-        # - name: CHAINCODE_NAME
-        #   value: "myccnew"
-        # - name: LANGUAGE
-        #   value: "node"
-        # - name: CHAINCODE_VERSION
-        #   value: "1.0.0"
+        - name: CHAINCODE_NAME
+          value: "mycc"
+        - name: LANGUAGE
+          value: "node"
+        - name: CHAINCODE_VERSION
+          value: "1.0"
         - name: FABRIC_CFG_PATH
           value: /etc/hyperledger/fabric
         - name: CORE_PEER_MSPCONFIGPATH
@@ -99,16 +96,13 @@ spec:
             cp -r /shared/javascript $GOPATH/src/github.com/chaincode/loyalty_point/ ;
             ls $GOPATH/src/github.com/chaincode/loyalty_point/javascript/ ;
             peer chaincode install -n ${CHAINCODE_NAME} -l ${LANGUAGE} -v ${CHAINCODE_VERSION} -p /opt/gopath/src/github.com/chaincode/loyalty_point/javascript/
-        envFrom:
-        - configMapRef:
-            name: chaincode-cm
         env:
-        # - name: CHAINCODE_NAME
-        #   value: "mycc"
-        # - name: LANGUAGE
-        #   value: "node"
-        # - name: CHAINCODE_VERSION
-        #   value: "1.0.0"
+        - name: CHAINCODE_NAME
+          value: "mycc"
+        - name: LANGUAGE
+          value: "node"
+        - name: CHAINCODE_VERSION
+          value: "1.0"
         - name: FABRIC_CFG_PATH
           value: /etc/hyperledger/fabric
         - name: CORE_PEER_MSPCONFIGPATH
@@ -143,16 +137,13 @@ spec:
             cp -r /shared/javascript $GOPATH/src/github.com/chaincode/loyalty_point/ ;
             ls $GOPATH/src/github.com/chaincode/loyalty_point/javascript/ ;
             peer chaincode install -n ${CHAINCODE_NAME} -l ${LANGUAGE} -v ${CHAINCODE_VERSION} -p /opt/gopath/src/github.com/chaincode/loyalty_point/javascript/
-        envFrom:
-        - configMapRef:
-            name: chaincode-cm
         env:
-        # - name: CHAINCODE_NAME
-        #   value: "mycc"
-        # - name: LANGUAGE
-        #   value: "node"
-        # - name: CHAINCODE_VERSION
-        #   value: "1.0.0"
+        - name: CHAINCODE_NAME
+          value: "mycc"
+        - name: LANGUAGE
+          value: "node"
+        - name: CHAINCODE_VERSION
+          value: "1.0"
         - name: FABRIC_CFG_PATH
           value: /etc/hyperledger/fabric
         - name: CORE_PEER_MSPCONFIGPATH
@@ -187,16 +178,13 @@ spec:
             cp -r /shared/javascript $GOPATH/src/github.com/chaincode/loyalty_point/ ;
             ls $GOPATH/src/github.com/chaincode/loyalty_point/javascript/ ;
             peer chaincode install -n ${CHAINCODE_NAME} -l ${LANGUAGE} -v ${CHAINCODE_VERSION} -p /opt/gopath/src/github.com/chaincode/loyalty_point/javascript/
-        envFrom:
-        - configMapRef:
-            name: chaincode-cm
         env:
-        # - name: CHAINCODE_NAME
-        #   value: "mycc"
-        # - name: LANGUAGE
-        #   value: "node"
-        # - name: CHAINCODE_VERSION
-        #   value: "1.0.0"
+        - name: CHAINCODE_NAME
+          value: "mycc"
+        - name: LANGUAGE
+          value: "node"
+        - name: CHAINCODE_VERSION
+          value: "1.0"
         - name: FABRIC_CFG_PATH
           value: /etc/hyperledger/fabric
         - name: CORE_PEER_MSPCONFIGPATH

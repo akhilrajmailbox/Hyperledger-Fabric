@@ -1,0 +1,9 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: chaincode-cm
+data:
+  CHANNEL_NAME: "mychannel"
+  CHAINCODE_NAME: "mycc"
+  LANGUAGE: "node"
+  CHAINCODE_VERSION: "$CHAINCODE_VERSION"

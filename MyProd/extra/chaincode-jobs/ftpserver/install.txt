@@ -1,0 +1,25 @@
+apt-get update && apt-get install vim sudo curl net-tools vsftpd -y
+cp /etc/vsftpd.conf /etc/vsftpd.conf.orig
+adduser sammy
+mkdir /home/sammy/ftp \
+    && chown nobody:nogroup /home/sammy/ftp \
+    && chmod a-w /home/sammy/ftp \
+    && mkdir /home/sammy/ftp/files \
+    && chown sammy:sammy /home/sammy/ftp/files \
+    && ls -la /home/sammy/ftp \
+    && echo "vsftpd test file" | sudo tee /home/sammy/ftp/files/test.txt
+vim /etc/vsftpd.conf
+echo "sammy" | sudo tee -a /etc/vsftpd.userlist \
+    && cat /etc/vsftpd.userlist \
+    && /etc/init.d/vsftpd start
+netstat -tulpn | grep -i listen
+
+
+links :
+https://www.digitalocean.com/community/tutorials/how-to-set-up-vsftpd-for-a-user-s-directory-on-ubuntu-16-04
+https://www.thegeekdiary.com/centos-rhel-how-to-change-vsftpd-port-number-from-the-default-port-numbers-20-and-21/
+https://superuser.com/questions/153888/ftp-error-425-failed-to-establish-connection
+
+https://hostadvice.com/how-to/how-to-use-ftp-to-transfer-files-between-servers-and-local-machines/
+https://www.hostmysite.com/support/upload/browser-ftp/
+https://www.tecmint.com/install-ftp-server-in-ubuntu/

@@ -2,6 +2,8 @@
 
 [hyperledger fabric docs](https://hyperledger-fabric.readthedocs.io)
 
+[hlf on k8s](#https://github.com/IBM/blockchain-network-on-kubernetes.git)
+
 ## Prerequisite
 
 * go version 1.13.4
@@ -51,6 +53,13 @@ kubectl describe challenge X
     * hosts
     * externalDatabase
     * config
+* Chaincode-Jobs
+    * chaincode-ConfigMap.yaml
+        * CHANNEL_NAME
+        * CHAINCODE_NAME
+        * LANGUAGE
+    * chaincode_install.yaml
+        * update the bash scripts according to your chaincode language
 * efs-provisioner-deployment.yml
     * file.system.id
     * aws.region
@@ -341,7 +350,10 @@ List all channels which a particular peer has joined.
 ./hlf.sh -o peer-create ---> (Create "N" Number of peers for "N" Orderers == "N*N")
 ./hlf.sh -o channel-create (One time configuration, run this only on one peer per Organisation [ peer-org1-1 / peer-org2-1 ])
 ./hlf.sh -o channel-join ---> (Run on "N" Peers on all Organisation)
+./hlf.sh -o cc-deploy
 ./hlf.sh -o channel-ls
+./hlf.sh -o cc-install-ls 
+./hlf.sh -o cc-instantiate-ls
 ```
 
 

@@ -1,12 +1,12 @@
 apiVersion: batch/v1
 kind: Job
 metadata:
-  name: chaincodeinstantiate
+  name: chaincodeupgrade
 spec:
   backoffLimit: 1
   template:
     metadata:
-      name: chaincodeinstantiate
+      name: chaincodeupgrade
     spec:
       restartPolicy: "Never"
       volumes:
@@ -26,14 +26,14 @@ spec:
           defaultMode: 420
           secretName: hlf--peer-org1-adminkey
       containers:
-      - name: chaincodeinstantiate
+      - name: chaincodeupgrade
         image: hyperledger/fabric-tools:1.4
         imagePullPolicy: Always
         command:
           - /bin/sh
           - -c
           - >
-            peer chaincode instantiate -o ord1-hlf-ord.orderers.svc.cluster.local:7050 -C ${CHANNEL_NAME} -n ${CHAINCODE_NAME} -l ${LANGUAGE} -v ${CHAINCODE_VERSION} -c '{"Args":[]}' -P "AND ('Org1MSP.member','Org2MSP.member')"
+            peer chaincode upgrade -o ord1-hlf-ord.orderers.svc.cluster.local:7050 -C ${CHANNEL_NAME} -n ${CHAINCODE_NAME} -l ${LANGUAGE} -v ${CHAINCODE_VERSION} -c '{"Args":[]}' -P "AND ('Org1MSP.member','Org2MSP.member')"
         envFrom:
         - configMapRef:
             name: chaincode-cm
