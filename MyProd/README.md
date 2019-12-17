@@ -33,6 +33,25 @@ which configtxgen
 which configtxlator
 ```
 
+
+### Create your K8s Cluster on AWS / Azure (below example only for AWS)
+
+
+```
+eksctl create cluster \
+    --zones us-east-1a,us-east-1b,us-east-1c \
+    --name HLF-Cluster \
+    --version 1.14 \
+    --region us-east-1 \
+    --nodegroup-name HLF-Cluster-workers \
+    --node-type t3a.2xlarge \
+    --nodes 5 \
+    --nodes-min 5 \
+    --nodes-max 5 \
+    --managed
+```
+
+
 [Configure Cert-manager with Let's Encrypt](https://cert-manager.io/docs/tutorials/acme/ingress/)
 
 ### [Debug Cert-manager](https://github.com/jetstack/cert-manager/issues/2020) ; You can actually find error messages in each of these, like so:
