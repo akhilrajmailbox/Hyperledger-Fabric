@@ -3,7 +3,7 @@ entries:
   dind:
   - apiVersion: v1
     appVersion: stable-dind
-    created: 2019-12-13T16:04:49.881291938+05:30
+    created: 2019-12-19T14:39:59.711765669+05:30
     description: DinD Deployment chart
     digest: e6b1347a552b258a8b1906d09410bbf83c861f3191953d9f9211e3116a07372e
     keywords:
@@ -17,9 +17,9 @@ entries:
   hlf-ca:
   - apiVersion: v1
     appVersion: 1.4.3
-    created: 2019-12-13T16:04:49.8837213+05:30
+    created: 2019-12-19T14:39:59.713611837+05:30
     description: Hyperledger Fabric Certificate Authority chart
-    digest: ef704d34d89a522e35671f7727b557d01ef5e03766a55d4c07ec2af14a62ceea
+    digest: f7f943322ac995137304be5ab21e3f99706d2ade91e505ae11e89a3f072816f5
     keywords:
     - blockchain
     - hyperledger
@@ -31,9 +31,9 @@ entries:
   hlf-couchdb:
   - apiVersion: v1
     appVersion: 0.4.10
-    created: 2019-12-13T16:04:49.88491749+05:30
+    created: 2019-12-19T14:39:59.714000193+05:30
     description: CouchDB instance for Hyperledger Fabric
-    digest: 39dd4302e350a350edb31e37164498f45be14206c843472b92d3fc7e32200567
+    digest: bbd3448846558ccf631afe559c20aca7d582c380084b0e5826c83aa6d2ef5297
     keywords:
     - blockchain
     - hyperledger
@@ -46,9 +46,9 @@ entries:
   hlf-ord:
   - apiVersion: v1
     appVersion: 1.4.3
-    created: 2019-12-13T16:04:49.886199294+05:30
+    created: 2019-12-19T14:39:59.714487829+05:30
     description: Hyperledger Fabric Orderer chart
-    digest: ea0b3e6dd40ed48fa6991e077479d614f9dc7d9f86b5c8bfcfcf53362c8d69d4
+    digest: f3640372814bd900ee6e38d8adcb2221880c3f1c525e026055207b7e895b64ad
     keywords:
     - blockchain
     - hyperledger
@@ -60,9 +60,9 @@ entries:
   hlf-peer:
   - apiVersion: v1
     appVersion: 1.4.3
-    created: 2019-12-13T16:04:49.887482891+05:30
+    created: 2019-12-19T14:39:59.714981503+05:30
     description: Hyperledger Fabric Peer chart
-    digest: 99aff7e4e4110d4c4b7d2154296f436ec1d22a591a0b0ba0b823b5e7e1548a99
+    digest: dad98ba55cab5e7804986dbf8e3f3e3c4c7ae938427376ee5122719ad744e51c
     keywords:
     - blockchain
     - hyperledger
@@ -71,4 +71,4 @@ entries:
     urls:
     - https://akhilrajmailbox.github.io/Hyperledger-Fabric/docs/hlf-peer-0.1.0.tgz
     version: 0.1.0
-generated: 2019-12-13T16:04:49.880030269+05:30
+generated: 2019-12-19T14:39:59.711228424+05:30

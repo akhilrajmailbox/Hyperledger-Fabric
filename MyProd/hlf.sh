@@ -81,7 +81,7 @@ function Storageclass_Configure() {
                     exit 1
                 fi
                 sleep 2
-                export EFS_PROVISIONER_STATUS=$(kubectl get pods -n default -l "app=efs-provisioner"  --output=jsonpath={.items..status.phase})
+                export EFS_PROVISIONER_STATUS=$(kubectl get pods -n default -l "app=efs-provisioner" --output=jsonpath={.items..status.phase})
             done
             echo "The EFS_PROVISIONER started and running...!"
             kubectl apply -f ${PROD_DIR}/extra/Storage/${CLOUD_PROVIDER}-RWMany-storageclass.yaml
@@ -114,14 +114,9 @@ function Pod_Status_Wait() {
 
     for i in ${Pod_Name} ; do
         Pod_Status=""
-        until [[ ${Pod_Status} == "true" ]] ; do
+        until [[ ${Pod_Status} == "Running" ]] ; do
             echo "Waiting for the pod : ${i} to start...!"
-            if [ "${Pod_Status}" == "false" ]; then
-                echo "There is an error in the Docker pod. Please check logs."
-                exit 1
-            fi
-            sleep 2
-            export Pod_Status=$(kubectl ${namespace_options} get pods ${i} -o jsonpath="{.status.containerStatuses[0].ready}")
+            export Pod_Status=$(kubectl ${namespace_options} get pods ${i} -o jsonpath="{.status.phase}")
         done
         echo "The pod : ${i} started and running...!"
     done
@@ -132,19 +127,31 @@ function Pod_Status_Wait() {
 ## Check job status
 function Job_Status_Wait() {
     echo "Checking pod status on : ${namespace_options} for the job : ${1}"
-    JOBSTATUS=""
-    PODSTATUS=""
-    while [ "${JOBSTATUS}" != "1/1" ]; do
-        echo "Waiting for ${1} job to be completed"
-        sleep 1;
-        if [[ ${PODSTATUS} == "Error" ]]; then
-            echo "Job ${1} Failed"
-            exit 1
+    if kubectl ${namespace_options} get jobs | grep ${1} ; then
+        if [[ ${2} == "dontkill" ]] ; then
+            echo -e "/n break option enabled /n"
         fi
-        JOBSTATUS=$(kubectl ${namespace_options} get jobs | grep ${1} | awk '{print $2}')
-        PODSTATUS=$(kubectl ${namespace_options} get pods --sort-by='{.metadata.creationTimestamp}' | grep ${1} | awk '{print $3}' | tail -1)
-    done
-    echo "job ${1} Completed Successfully"
+
+        JOBSTATUS=""
+        PODSTATUS=""
+        while [ "${JOBSTATUS}" != "1/1" ]; do
+            echo "Waiting for ${1} job to be completed"
+            sleep 1;
+            if [[ ${PODSTATUS} == "Error" ]] && [[ ${2} == "dontkill" ]] ; then
+                echo "Job ${1} Failed and loop breaking...!"
+                break
+            elif [[ ${PODSTATUS} == "Error" ]] ; then
+                echo "Job ${1} Failed"
+                exit 1
+            fi
+            JOBSTATUS=$(kubectl ${namespace_options} get jobs | grep ${1} | awk '{print $2}')
+            PODSTATUS=$(kubectl ${namespace_options} get pods --sort-by='{.metadata.creationTimestamp}' | grep ${1} | awk '{print $3}' | tail -1)
+        done
+        echo "job ${1} Completed Successfully"
+    else
+        echo "no jobs found with name : ${1}"
+        exit 1
+    fi
 }
 
 
@@ -215,7 +222,11 @@ function Dind_Configure() {
 #######################################
 ## Chaincode storage
 function CC_Storage_Configure() {
-    Cloud_Provider
+    if [[ -z ${CLOUD_PROVIDER} ]] ; then
+        echo "CLOUD_PROVIDER can't be empty...!"
+        Cloud_Provider
+    fi
+
     echo "Configure Chaincode Storage on ${CLOUD_PROVIDER}...!"
     Setup_Namespace peers
     if $(kubectl get storageclass rwmany > /dev/null 2>&1) ; then
@@ -224,6 +235,8 @@ function CC_Storage_Configure() {
         echo "storageclass : rwmany not found....!"
         exit 1
     fi
+
+    kubectl ${namespace_options} apply -f ${PROD_DIR}/extra/Chaincode-Jobs/chaincode_storage.yaml
     CC_STORAGE_POD=$(kubectl ${namespace_options} get pods -l "component=chaincodestorage,role=storage-server" -o jsonpath="{.items[0].metadata.name}")
     Pod_Status_Wait ${CC_STORAGE_POD}
 }
@@ -286,7 +299,7 @@ function Fabric_CA_Configure() {
     ## configuring namespace for fabric ca
     Setup_Namespace cas
 
-    helm install stable/hlf-ca -n ca ${namespace_options} -f ${PROD_DIR}/helm_values/ca.yaml
+    helm install ar-repo/hlf-ca -n ca ${namespace_options} -f ${PROD_DIR}/helm_values/ca.yaml
     export CA_POD=$(kubectl get pods ${namespace_options} -l "app=hlf-ca,release=ca" -o jsonpath="{.items[0].metadata.name}")
 
     until kubectl logs ${namespace_options} ${CA_POD} | grep "Listening on" > /dev/null 2>&1 ; do
@@ -303,8 +316,18 @@ function Fabric_CA_Configure() {
     fi
 
     ## Check that ingress works correctly
-    export CA_INGRESS=$(kubectl get ingress ${namespace_options} -l "app=hlf-ca,release=ca" -o jsonpath="{.items[0].spec.rules[0].host}")
+    Get_CA_Info
     curl https://${CA_INGRESS}/cainfo
+}
+
+
+#######################################
+## getting CA_INGRESS
+function Get_CA_Info() {
+    echo "Fabric CA Info...!"
+    Setup_Namespace cas
+    export CA_INGRESS=$(kubectl get ingress ${namespace_options} -l "app=hlf-ca,release=ca" -o jsonpath="{.items[0].spec.rules[0].host}")
+    export CA_POD=$(kubectl get pods ${namespace_options} -l "app=hlf-ca,release=ca" -o jsonpath="{.items[0].metadata.name}")
 }
 
 
@@ -316,20 +339,24 @@ function Orgadmin_Orderer_Configure() {
         echo "Orderer Admin already configured...!"
         echo "Please move/rename the folder ${PROD_DIR}/config/OrdererMSP, then try to run this command again...!"
         echo ""
-        echo -e "Delete the secrets also. \n kubectl -n peers delete secrets hlf--ord-admincert hlf--ord-adminkey hlf--ord-ca-cert"
+        echo -e "Delete the secrets also. \n kubectl -n orderers delete secrets hlf--ord-admincert hlf--ord-adminkey hlf--ord-ca-cert"
         echo ""
+
+        Get_CA_Info
+        if $(kubectl exec ${namespace_options} ${CA_POD} -- fabric-ca-client identity list --id ord-admin > /dev/null 2>&1) ; then
+            echo "identity of ord-admin already there...!"
+            echo "If you really want to recreate the identity , the run the following command to remove the identiry : ord-admin from CA Server, then run the same command again to create it"
+            echo -e "\n kubectl exec ${namespace_options} ${CA_POD} -- fabric-ca-client identity remove ord-admin \n"
+        else
+            echo "No identity Registered on CA"
+        fi
         echo "Warning :: I sure hope you know what you're doing...!"
         echo ""
         exit 1
     else
+        Get_CA_Info
         echo "Configuring Org Orderer Admin...!"
         export ORDERER_ADMIN_PASS=$(base64 <<< ${K8S_NAMESPACE}-ord-admin)
-
-        ## getting CA_INGRESS
-        Setup_Namespace cas
-        export CA_INGRESS=$(kubectl get ingress ${namespace_options} -l "app=hlf-ca,release=ca" -o jsonpath="{.items[0].spec.rules[0].host}")
-        export CA_POD=$(kubectl get pods ${namespace_options} -l "app=hlf-ca,release=ca" -o jsonpath="{.items[0].metadata.name}")
-
         export Admin_Conf=Orderer
         ## Get identity of ord-admin (this should not exist at first)
         if $(kubectl exec ${namespace_options} ${CA_POD} -- fabric-ca-client identity list --id ord-admin > /dev/null 2>&1) ; then
@@ -365,19 +392,25 @@ function Orgadmin_Peer_Configure() {
         echo ""
         echo -e "Delete the secrets also. \n kubectl -n peers delete secrets hlf--peer-org${ORG_NUM}-admincert hlf--peer-org${ORG_NUM}-adminkey hlf--peer-org${ORG_NUM}-ca-cert"
         echo ""
+        Get_CA_Info
+        echo -e "\n Checking the identity on CA...! \n"
+        if $(kubectl exec ${namespace_options} ${CA_POD} -- fabric-ca-client identity list --id peer-org${ORG_NUM}-admin > /dev/null 2>&1) ; then
+            echo "identity of peer-org${ORG_NUM}-admin already there...!"
+            echo "If you really want to recreate the identity , the run the following command to remove the identiry : peer-org${ORG_NUM}-admin from CA Server, then run the same command again to create it"
+            echo -e "\n kubectl exec ${namespace_options} ${CA_POD} -- fabric-ca-client identity remove peer-org${ORG_NUM}-admin \n"
+            echo ""
+        else
+            echo "No identity Registered on CA"
+        fi
         echo "Warning :: I sure hope you know what you're doing...!"
         echo ""
         exit 1
     else
+        Get_CA_Info
         echo "Configuring Org Peer Admin...!"
         export PEER_ADMIN_PASS=$(base64 <<< ${K8S_NAMESPACE}-peer-org${ORG_NUM}-admin)
-
-        ## getting CA_INGRESS
-        Setup_Namespace cas
-        export CA_INGRESS=$(kubectl get ingress ${namespace_options} -l "app=hlf-ca,release=ca" -o jsonpath="{.items[0].spec.rules[0].host}")
-        export CA_POD=$(kubectl get pods ${namespace_options} -l "app=hlf-ca,release=ca" -o jsonpath="{.items[0].metadata.name}")
-
         export Admin_Conf=Peer
+
         ## Get identity of peer-org${ORG_NUM}-admin (this should not exist at first)
         if $(kubectl exec ${namespace_options} ${CA_POD} -- fabric-ca-client identity list --id peer-org${ORG_NUM}-admin > /dev/null 2>&1) ; then
             echo "identity of peer-org${ORG_NUM}-admin already there...!"
@@ -509,20 +542,24 @@ function Orderer_Conf() {
         echo ""
         echo -e "Delete the secrets also. \n kubectl -n orderers delete secrets hlf--ord${ORDERER_NUM}-idcert hlf--ord${ORDERER_NUM}-idkey"
         echo ""
+        Get_CA_Info
+        echo -e "\n Checking the identity on CA...! \n"
+        if $(kubectl exec ${namespace_options} ${CA_POD} -- fabric-ca-client identity list --id ord${ORDERER_NUM} > /dev/null 2>&1) ; then
+            echo "identity of ord${ORDERER_NUM} already there...!"
+            echo "If you really want to recreate the identity , the run the following command to remove the identiry : ord${ORDERER_NUM} from CA Server, then run the same command again to create it"
+            echo -e "\n kubectl exec ${namespace_options} ${CA_POD} -- fabric-ca-client identity remove ord${ORDERER_NUM} \n"
+            echo ""
+        else
+            echo "No identity Registered on CA"
+        fi
         echo "Warning :: I sure hope you know what you're doing...!"
         echo ""
         exit 1
     else
+        Get_CA_Info
         echo "Create and Add Orderer node...!"
         export ORDERER_NODE_PASS=$(base64 <<< ${K8S_NAMESPACE}-ord-${ORDERER_NUM})
 
-        ## getting CA_INGRESS value and Gatering cas pod name
-        Setup_Namespace cas
-        export CA_INGRESS=$(kubectl get ingress ${namespace_options} -l "app=hlf-ca,release=ca" -o jsonpath="{.items[0].spec.rules[0].host}")
-        export CA_POD=$(kubectl get pods ${namespace_options} -l "app=hlf-ca,release=ca" -o jsonpath="{.items[0].metadata.name}")
-
-        ## Register orderer with CA
-        Setup_Namespace cas
         ## Get identity of ord${ORDERER_NUM} (this should not exist at first)
         if $(kubectl exec ${namespace_options} ${CA_POD} -- fabric-ca-client identity list --id ord${ORDERER_NUM} > /dev/null 2>&1) ; then
             echo "identity of ord${ORDERER_NUM} already there...!"
@@ -547,7 +584,7 @@ function Orderer_Conf() {
 
             ## Install orderers using helm
             envsubst < ${PROD_DIR}/helm_values/ord.yaml > ${PROD_DIR}/config/MyConfig/ord${ORDERER_NUM}.yaml
-            helm install stable/hlf-ord -n ord${ORDERER_NUM} ${namespace_options} -f ${PROD_DIR}/config/MyConfig/ord${ORDERER_NUM}.yaml
+            helm install ar-repo/hlf-ord -n ord${ORDERER_NUM} ${namespace_options} -f ${PROD_DIR}/config/MyConfig/ord${ORDERER_NUM}.yaml
 
             ## Get logs from orderer to check it's actually started
             export ORD_POD=$(kubectl get pods ${namespace_options} -l "app=hlf-ord,release=ord${ORDERER_NUM}" -o jsonpath="{.items[0].metadata.name}")
@@ -574,23 +611,27 @@ function Peer_Conf() {
         echo ""
         echo -e "Delete the secrets also. \n kubectl -n peers delete secrets hlf--peer${PEER_NUM}-org${ORG_NUM}-idcert hlf--peer${PEER_NUM}-org${ORG_NUM}-idkey"
         echo ""
+        Get_CA_Info
+        echo -e "\n Checking the identity on CA...! \n"
+        if $(kubectl exec ${namespace_options} ${CA_POD} -- fabric-ca-client identity list --id peer${PEER_NUM}-org${ORG_NUM} > /dev/null 2>&1) ; then
+            echo "identity of peer${PEER_NUM}-org${ORG_NUM} already there...!"
+            echo "If you really want to recreate the identity , the run the following command to remove the identiry : peer${PEER_NUM}-org${ORG_NUM} from CA Server, then run the same command again to create it"
+            echo -e "\n kubectl exec ${namespace_options} ${CA_POD} -- fabric-ca-client identity remove peer${PEER_NUM}-org${ORG_NUM} \n"
+            echo ""
+        else
+            echo "No identity Registered on CA"
+        fi
         echo "Warning :: I sure hope you know what you're doing...!"
         echo ""
         exit 1
     else
         echo "Create and Add Peer node...!"
-
         export PEER_NODE_PASS=$(base64 <<< ${K8S_NAMESPACE}-peer${PEER_NUM}-org${ORG_NUM})
-
-        ## getting CA_INGRESS value and Gatering cas pod name
-        Setup_Namespace cas
-        export CA_INGRESS=$(kubectl get ingress ${namespace_options} -l "app=hlf-ca,release=ca" -o jsonpath="{.items[0].spec.rules[0].host}")
-        export CA_POD=$(kubectl get pods ${namespace_options} -l "app=hlf-ca,release=ca" -o jsonpath="{.items[0].metadata.name}")
 
         ## Install CouchDB chart
         Setup_Namespace peers
         envsubst < ${PROD_DIR}/helm_values/cdb-peer.yaml > ${PROD_DIR}/config/MyConfig/cdb-peer${PEER_NUM}-org${ORG_NUM}.yaml
-        helm install stable/hlf-couchdb -n cdb-peer${PEER_NUM}-org${ORG_NUM} ${namespace_options} -f ${PROD_DIR}/config/MyConfig/cdb-peer${PEER_NUM}-org${ORG_NUM}.yaml
+        helm install ar-repo/hlf-couchdb -n cdb-peer${PEER_NUM}-org${ORG_NUM} ${namespace_options} -f ${PROD_DIR}/config/MyConfig/cdb-peer${PEER_NUM}-org${ORG_NUM}.yaml
 
         ## Check that CouchDB is running
         export CDB_POD=$(kubectl get pods ${namespace_options} -l "app=hlf-couchdb,release=cdb-peer${PEER_NUM}-org${ORG_NUM}" -o jsonpath="{.items[*].metadata.name}")
@@ -602,9 +643,7 @@ function Peer_Conf() {
         Pod_Status_Wait ${CDB_POD}
         echo "CouchDB started...! : ${CDB_POD}"
 
-
-        ## Register Peer with CA
-        Setup_Namespace cas
+        Get_CA_Info
         ## Get identity of peer${PEER_NUM}-org${ORG_NUM} (this should not exist at first)
         if $(kubectl exec ${namespace_options} ${CA_POD} -- fabric-ca-client identity list --id peer${PEER_NUM}-org${ORG_NUM} > /dev/null 2>&1) ; then
             echo "identity of peer${PEER_NUM}-org${ORG_NUM} already there...!"
@@ -630,7 +669,7 @@ function Peer_Conf() {
 
             ## Install Peer using helm
             envsubst < ${PROD_DIR}/helm_values/peer.yaml > ${PROD_DIR}/config/MyConfig/peer${PEER_NUM}-org${ORG_NUM}.yaml
-            helm install stable/hlf-peer -n peer${PEER_NUM}-org${ORG_NUM} ${namespace_options} -f ${PROD_DIR}/config/MyConfig/peer${PEER_NUM}-org${ORG_NUM}.yaml
+            helm install ar-repo/hlf-peer -n peer${PEER_NUM}-org${ORG_NUM} ${namespace_options} -f ${PROD_DIR}/config/MyConfig/peer${PEER_NUM}-org${ORG_NUM}.yaml
 
             ## check that Peer is running
             export PEER_POD=$(kubectl get pods ${namespace_options} -l "app=hlf-peer,release=peer${PEER_NUM}-org${ORG_NUM}" -o jsonpath="{.items[0].metadata.name}")
@@ -779,7 +818,6 @@ function CC_Install() {
     Setup_Namespace peers
 
     ## Configuring Shared storage server for chaincode
-    kubectl ${namespace_options} apply -f ${PROD_DIR}/extra/Chaincode-Jobs/chaincode_storage.yaml
     CC_STORAGE_POD=$(kubectl ${namespace_options} get pods -l "component=chaincodestorage,role=storage-server" -o jsonpath="{.items[0].metadata.name}")
     Pod_Status_Wait ${CC_STORAGE_POD}
 
@@ -789,7 +827,7 @@ function CC_Install() {
 
     if kubectl exec ${namespace_options} ${CC_STORAGE_POD} -- ls /shared/${CC_LOCATION_BASENAME} ; then
         echo "${CC_LOCATION_BASENAME} already available in the network, backing up in remote system...!"
-        kubectl exec ${namespace_options} ${CC_STORAGE_POD} -- mv /shared/${CC_LOCATION_BASENAME} /shared/${CC_LOCATION_BASENAME}-$(date +%F-%H-%M-%S)
+        kubectl exec ${namespace_options} ${CC_STORAGE_POD} -- mv /shared/${CC_LOCATION_BASENAME} /shared/${CC_LOCATION_BASENAME}-${CHAINCODE_NAME}-${CHAINCODE_OLD_VER}
     fi
     echo -e "\nCopying chaincode from local to remote system"
     kubectl cp ${namespace_options} ${CC_LOCATION} ${CC_STORAGE_POD}:/shared/
@@ -818,18 +856,66 @@ function CC_Deploy() {
             kubectl ${namespace_options} delete jobs chaincodeinstantiate
         fi
         kubectl ${namespace_options} apply -f ${PROD_DIR}/extra/Chaincode-Jobs/chaincode_instantiate.yaml
-        Job_Status_Wait chaincodeinstantiate
+        Job_Status_Wait chaincodeinstantiate dontkill
+        echo -e "\n rollback initiated...! \n"
+        CC_Delete
     elif [[ ${CHAINCODE_VER_SET} == "update" ]] ; then
         echo -e "\nCreating chaincodeupgrade job"
         if kubectl ${namespace_options} get jobs | grep chaincodeupgrade > /dev/null 2>&1 ; then
             kubectl ${namespace_options} delete jobs chaincodeupgrade
         fi
         kubectl ${namespace_options} apply -f ${PROD_DIR}/extra/Chaincode-Jobs/chaincode_upgrade.yaml
-        Job_Status_Wait chaincodeupgrade
+        Job_Status_Wait chaincodeupgrade dontkill
+        echo -e "\n rollback initiated...! \n"
+        CC_Delete
     else
         echo "CHAINCODE_VER_SET is empty...!"
         exit 1
     fi
+}
+
+
+#######################################
+## Chaincode delete
+function CC_Delete() {
+    Setup_Namespace peers
+
+    ## checking DinD server
+    export DIND_POD=$(kubectl ${namespace_options} get pods -l "app=dind" -o jsonpath="{.items[0].metadata.name}")
+    Pod_Status_Wait ${DIND_POD}
+
+    ## Configuring Shared storage server for chaincode
+    CC_STORAGE_POD=$(kubectl ${namespace_options} get pods -l "component=chaincodestorage,role=storage-server" -o jsonpath="{.items[0].metadata.name}")
+    Pod_Status_Wait ${CC_STORAGE_POD}
+    echo "kubectl exec ${namespace_options} ${CC_STORAGE_POD} -- rm -rf /shared/${CC_LOCATION_BASENAME}" | bash
+
+    PEERS_PODS=$(kubectl ${namespace_options} get pods  | grep "^peer" | awk '{print $1}')
+    CHAINCODE_NAME=$(kubectl ${namespace_options} get configmap chaincode-cm -o jsonpath="{.data.CHAINCODE_NAME}")
+    CHAINCODE_VERSION=$(kubectl ${namespace_options} get configmap chaincode-cm -o jsonpath="{.data.CHAINCODE_VERSION}")
+
+    for peer_pods in ${PEERS_PODS} ; do
+        echo "executing chaincode delete function on peer : ${peer_pods}"
+        if echo "kubectl exec ${namespace_options} ${peer_pods} -- bash -c 'CORE_PEER_MSPCONFIGPATH=\$ADMIN_MSP_PATH peer chaincode list --installed'" | bash | grep ${CHAINCODE_NAME} | grep ${CHAINCODE_VERSION} ; then
+            echo "chaincode ${CHAINCODE_NAME} with version : ${CHAINCODE_VERSION} found...!"
+            echo "kubectl ${namespace_options} exec ${peer_pods} -- bash -c 'rm -rf /var/hyperledger/production/chaincodes/${CHAINCODE_NAME}.${CHAINCODE_VERSION}'" | bash
+            if echo "kubectl exec ${namespace_options} ${peer_pods} -- bash -c 'CORE_PEER_MSPCONFIGPATH=\$ADMIN_MSP_PATH peer chaincode list --installed'" | bash | grep ${CHAINCODE_NAME} | grep ${CHAINCODE_VERSION} ; then
+                echo "tried to delete, but failed..!" ;
+                exit 1 ;
+            fi
+        else
+            echo "chaincode : ${CHAINCODE_NAME} not installed on peer ${peer_pods} with version : ${CHAINCODE_VERSION}"
+        fi
+    done
+
+
+
+
+    # echo -e "\nCreating deletechaincode job"
+    # if kubectl ${namespace_options} get jobs | grep chaincodedelete > /dev/null 2>&1 ; then
+    #     kubectl ${namespace_options} delete jobs chaincodedelete
+    # fi
+    # kubectl ${namespace_options} apply -f ${PROD_DIR}/extra/Chaincode-Jobs/chaincode_delete.yaml
+    # Job_Status_Wait chaincodedelete
 }
 
 
@@ -931,6 +1017,8 @@ elif [[ $option = cc-deploy ]]; then
     CC_Version
     CC_Install
     CC_Deploy
+elif [[ $option = cc-delete ]]; then
+    CC_Delete
 elif [[ $option = channel-ls ]]; then
     List_Channel
 elif [[ $option = cc-install-ls ]]; then
@@ -956,6 +1044,7 @@ peer-create         :   Create the Orderers certs and configure it in the K8s se
 channel-create      :   One time configuraiton on first peer (peer-org1-1 / peer-org2-1) on each organisation ; Creating the channel in one peer
 channel-join        :   Join to the channel which we created before
 cc-deploy           :   Install / Instantiate / Upgrade chaincode
+cc-delete           :   Delete the latest version of installed chaincode
 channel-ls          :   List all channels which a particular peer has joined
 cc-install-ls       :   List chaincode which installed on a particular peer
 cc-instantiate-ls   :   List chaincode which instantiated on a particular peer per channel

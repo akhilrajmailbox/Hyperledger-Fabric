@@ -40,11 +40,33 @@ which configtxlator
 
 ```
 eksctl create cluster \
+    --name HLF-Cluster \
+    --version 1.14 \
     --zones us-east-1a,us-east-1b,us-east-1c \
+    --region us-east-1 \
+    --nodegroup-name HLF-Cluster-Nodeworkers \
+    --node-type t3a.2xlarge \
+    --nodes 5 \
+    --nodes-min 5 \
+    --nodes-max 5 \
+    --managed
+```
+
+**create eks cluster with exsisting VPC**
+
+choose the following option according to your vpc network configuration
+
+* --vpc-private-subnets
+* --vpc-public-subnets
+
+
+```
+eksctl create cluster \
     --name HLF-Cluster \
     --version 1.14 \
     --region us-east-1 \
-    --nodegroup-name HLF-Cluster-workers \
+    --vpc-public-subnets subnet-f8b2d09f,subnet-3acaa314,subnet-41d4e60b \
+    --nodegroup-name HLF-Cluster-Nodeworkers \
     --node-type t3a.2xlarge \
     --nodes 5 \
     --nodes-min 5 \

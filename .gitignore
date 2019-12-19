@@ -7,3 +7,13 @@ custom_values
 *.block
 crypto-config
 */charts
+
+/channel-artifacts/*.tx
+/channel-artifacts/*.block
+/crypto-config/*
+
+.DS_Store
+MyProd/config/*MSP
+MyProd/config/*.tx
+MyProd/config/*.block
+MyProd/config/MyConfig
