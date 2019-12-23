@@ -1,6 +1,6 @@
 #!/bin/bash
 export PROD_DIR="./"
-export JOIN_PEERS="1 2 3 4"
+export CUSTOM_PEERS="1 2 3 4"
 
 if [[ ! -d ${PROD_DIR}/config/MyConfig ]] ; then
     echo "Custom Values Store Creating...!"
@@ -557,7 +557,7 @@ function Orderer_Conf() {
         echo "ord${ORDERER_NUM} already configured...!"
         echo "Please move/rename the folder ${PROD_DIR}/config/ord${ORDERER_NUM}_MSP, then try to run this command again...!"
         echo ""
-        echo -e "Delete the secrets also. \n kubectl -n orderers delete secrets hlf--ord${ORDERER_NUM}-idcert hlf--ord${ORDERER_NUM}-idkey"
+        echo -e "Delete the helm chart deployment : \n helm del --purge ord${ORDERER_NUM} \nDelete the secrets also. \n kubectl -n orderers delete secrets hlf--ord${ORDERER_NUM}-idcert hlf--ord${ORDERER_NUM}-idkey"
         echo ""
         Get_CA_Info
         echo -e "\n Checking the identity on CA...! \n"
@@ -627,7 +627,7 @@ function Peer_Conf() {
         echo "peer${PEER_NUM}-org${ORG_NUM} already configured...!"
         echo "Please move/rename the folder ${PROD_DIR}/config/peer${PEER_NUM}-org${ORG_NUM}_MSP, then try to run this command again...!"
         echo ""
-        echo -e "Delete the secrets also. \n kubectl -n peers delete secrets hlf--peer${PEER_NUM}-org${ORG_NUM}-idcert hlf--peer${PEER_NUM}-org${ORG_NUM}-idkey"
+        echo -e "Delete the helm chart deployment : \n helm del --purge cdb-peer${PEER_NUM}-org${ORG_NUM} \n helm del --purge peer${PEER_NUM}-org${ORG_NUM} \nDelete the secrets also. \n kubectl -n peers delete secrets hlf--peer${PEER_NUM}-org${ORG_NUM}-idcert hlf--peer${PEER_NUM}-org${ORG_NUM}-idkey"
         echo ""
         Get_CA_Info
         echo -e "\n Checking the identity on CA...! \n"
@@ -741,15 +741,16 @@ function Join_Channel() {
     Setup_Namespace peers
     Choose_Env org_number
     Choose_Env channel_name
-    if [[ ! -z ${JOIN_PEERS} ]] ; then
-        export PEER_NUM=${JOIN_PEERS}
+    if [[ ! -z ${CUSTOM_PEERS} ]] ; then
+        export PEER_NUM=${CUSTOM_PEERS}
         echo -e "\n these peers ${PEER_NUM} will join to the channel : ${CHANNEL_NAME} \n"
     else
         Choose_Env peer_number
     fi
 
     for Peer_No in ${PEER_NUM} ; do
-        echo "Join Channel in peer : peer${Peer_No}-org${ORG_NUM}"
+        echo -e "\n _-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_ \n "
+        echo -e "\n Join Channel in peer : peer${Peer_No}-org${ORG_NUM} \n"
         export PEER_POD=$(kubectl get pods ${namespace_options} -l "app=hlf-peer,release=peer${Peer_No}-org${ORG_NUM}" -o jsonpath="{.items[0].metadata.name}")
         Pod_Status_Wait ${PEER_POD}
         echo "Connecting with Peer : peer${Peer_No}-org${ORG_NUM}on pod : ${PEER_POD}"
@@ -794,7 +795,7 @@ function CC_Version() {
     export PEER_POD=$(kubectl get pods ${namespace_options} -l "app=hlf-peer,release=peer${PEER_NUM}-org${ORG_NUM}" -o jsonpath="{.items[0].metadata.name}")
     Pod_Status_Wait ${PEER_POD}
 
-    if echo "kubectl exec ${namespace_options} ${PEER_POD} -- bash -c 'CORE_PEER_MSPCONFIGPATH=\$ADMIN_MSP_PATH peer chaincode list --instantiated -C ${CHANNEL_NAME}'" | bash | grep ${CHAINCODE_NAME} ; then
+    if echo "kubectl exec ${namespace_options} ${PEER_POD} -- bash -c 'CORE_PEER_MSPCONFIGPATH=\$ADMIN_MSP_PATH peer chaincode list --instantiated -C ${CHANNEL_NAME}'" | bash | grep -v ${CHANNEL_NAME} | grep ${CHAINCODE_NAME} ; then
         echo -e "chaincode with name : ${CHAINCODE_NAME} installed...\n checking the version"
         export CHAINCODE_OLD_VER=$(echo "kubectl exec ${namespace_options} ${PEER_POD} -- bash -c 'CORE_PEER_MSPCONFIGPATH=\$ADMIN_MSP_PATH peer chaincode list --instantiated -C ${CHANNEL_NAME}'" | bash | tail -1 | grep "Version:" | awk '{print $4}' | cut -f1 -d",")
         if [[ -z ${CHAINCODE_OLD_VER} ]] ; then
@@ -989,8 +990,8 @@ function List_Channel() {
 
     Setup_Namespace peers
     Choose_Env org_number
-    if [[ ! -z ${JOIN_PEERS} ]] ; then
-        export PEER_NUM=${JOIN_PEERS}
+    if [[ ! -z ${CUSTOM_PEERS} ]] ; then
+        export PEER_NUM=${CUSTOM_PEERS}
         echo -e "\n these peers ${PEER_NUM} will check to get the channel info \n"
     else
         Choose_Env peer_number
@@ -1011,8 +1012,8 @@ function List_Chaincode_Install() {
 
     Setup_Namespace peers
     Choose_Env org_number
-    if [[ ! -z ${JOIN_PEERS} ]] ; then
-        export PEER_NUM=${JOIN_PEERS}
+    if [[ ! -z ${CUSTOM_PEERS} ]] ; then
+        export PEER_NUM=${CUSTOM_PEERS}
         echo -e "\n these peers ${PEER_NUM} will check to get the chaincode install info \n"
     else
         Choose_Env peer_number
@@ -1034,8 +1035,8 @@ function List_Chaincode_Instantiate() {
     Setup_Namespace peers
     Choose_Env org_number
     Choose_Env channel_name
-    if [[ ! -z ${JOIN_PEERS} ]] ; then
-        export PEER_NUM=${JOIN_PEERS}
+    if [[ ! -z ${CUSTOM_PEERS} ]] ; then
+        export PEER_NUM=${CUSTOM_PEERS}
         echo -e "\n these peers ${PEER_NUM} will check to get the chaincode install info \n"
     else
         Choose_Env peer_number
