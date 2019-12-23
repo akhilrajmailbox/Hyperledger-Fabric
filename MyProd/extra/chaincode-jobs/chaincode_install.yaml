@@ -42,8 +42,9 @@ spec:
           secretName: hlf--peer-org2-adminkey
 
       containers:
+########### Org1
 # peer1-org1
-      - name: chaincodeinstallorg1peer1
+      - name: peer1-org1
         image: hyperledger/fabric-tools:1.4
         imagePullPolicy: Always
         command:
@@ -87,7 +88,7 @@ spec:
         - mountPath: /var/hyperledger/admin_msp/keystore
           name: admin-key-org1
 # peer2-org1
-      - name: chaincodeinstallorg1peer2
+      - name: peer2-org1
         image: hyperledger/fabric-tools:1.4
         imagePullPolicy: Always
         command:
@@ -130,8 +131,97 @@ spec:
           name: admin-cert-org1
         - mountPath: /var/hyperledger/admin_msp/keystore
           name: admin-key-org1
+# peer3-org1
+      - name: peer3-org1
+        image: hyperledger/fabric-tools:1.4
+        imagePullPolicy: Always
+        command:
+          - /bin/sh
+          - -c
+          - >
+            echo $GOPATH ;
+            mkdir -p $GOPATH/src/github.com/chaincode/loyalty_point/ ;
+            cp -r /shared/javascript $GOPATH/src/github.com/chaincode/loyalty_point/ ;
+            ls $GOPATH/src/github.com/chaincode/loyalty_point/javascript/ ;
+            peer chaincode install -n ${CHAINCODE_NAME} -l ${LANGUAGE} -v ${CHAINCODE_VERSION} -p /opt/gopath/src/github.com/chaincode/loyalty_point/javascript/
+        envFrom:
+        - configMapRef:
+            name: chaincode-cm
+        env:
+        # - name: CHAINCODE_NAME
+        #   value: "myccnew"
+        # - name: LANGUAGE
+        #   value: "node"
+        # - name: CHAINCODE_VERSION
+        #   value: "1.0.0"
+        - name: FABRIC_CFG_PATH
+          value: /etc/hyperledger/fabric
+        - name: CORE_PEER_MSPCONFIGPATH
+          value: /var/hyperledger/admin_msp
+        - name: CORE_PEER_LOCALMSPID
+          value: Org1MSP
+        - name: CORE_PEER_ADDRESS
+          value: peer3-org1-hlf-peer.peers.svc.cluster.local:7051
+        - name: GODEBUG
+          value: "netdns=go"
+        volumeMounts:
+        - mountPath: /shared
+          name: sharedvolume
+        - mountPath: /var/hyperledger/admin_msp/cacerts
+          name: cacert-org1
+        - mountPath: /var/hyperledger/admin_msp/admincerts
+          name: admin-cert-org1
+        - mountPath: /var/hyperledger/admin_msp/signcerts
+          name: admin-cert-org1
+        - mountPath: /var/hyperledger/admin_msp/keystore
+          name: admin-key-org1
+# peer4-org1
+      - name: peer4-org1
+        image: hyperledger/fabric-tools:1.4
+        imagePullPolicy: Always
+        command:
+          - /bin/sh
+          - -c
+          - >
+            echo $GOPATH ;
+            mkdir -p $GOPATH/src/github.com/chaincode/loyalty_point/ ;
+            cp -r /shared/javascript $GOPATH/src/github.com/chaincode/loyalty_point/ ;
+            ls $GOPATH/src/github.com/chaincode/loyalty_point/javascript/ ;
+            peer chaincode install -n ${CHAINCODE_NAME} -l ${LANGUAGE} -v ${CHAINCODE_VERSION} -p /opt/gopath/src/github.com/chaincode/loyalty_point/javascript/
+        envFrom:
+        - configMapRef:
+            name: chaincode-cm
+        env:
+        # - name: CHAINCODE_NAME
+        #   value: "mycc"
+        # - name: LANGUAGE
+        #   value: "node"
+        # - name: CHAINCODE_VERSION
+        #   value: "1.0.0"
+        - name: FABRIC_CFG_PATH
+          value: /etc/hyperledger/fabric
+        - name: CORE_PEER_MSPCONFIGPATH
+          value: /var/hyperledger/admin_msp
+        - name: CORE_PEER_LOCALMSPID
+          value: Org1MSP
+        - name: CORE_PEER_ADDRESS
+          value: peer4-org1-hlf-peer.peers.svc.cluster.local:7051
+        - name: GODEBUG
+          value: "netdns=go"
+        volumeMounts:
+        - mountPath: /shared
+          name: sharedvolume
+        - mountPath: /var/hyperledger/admin_msp/cacerts
+          name: cacert-org1
+        - mountPath: /var/hyperledger/admin_msp/admincerts
+          name: admin-cert-org1
+        - mountPath: /var/hyperledger/admin_msp/signcerts
+          name: admin-cert-org1
+        - mountPath: /var/hyperledger/admin_msp/keystore
+          name: admin-key-org1
+########### Org2
 # peer1-org2
-      - name: chaincodeinstallorg2peer1
+      - name: peer1-org2
         image: hyperledger/fabric-tools:1.4
         imagePullPolicy: Always
         command:
@@ -175,7 +265,7 @@ spec:
         - mountPath: /var/hyperledger/admin_msp/keystore
           name: admin-key-org2
 # peer2-org2
-      - name: chaincodeinstallorg2peer2
+      - name: peer2-org2
         image: hyperledger/fabric-tools:1.4
         imagePullPolicy: Always
         command:
@@ -205,6 +295,94 @@ spec:
           value: Org2MSP
         - name: CORE_PEER_ADDRESS
           value: peer2-org2-hlf-peer.peers.svc.cluster.local:7051
+        - name: GODEBUG
+          value: "netdns=go"
+        volumeMounts:
+        - mountPath: /shared
+          name: sharedvolume
+        - mountPath: /var/hyperledger/admin_msp/cacerts
+          name: cacert-org2
+        - mountPath: /var/hyperledger/admin_msp/admincerts
+          name: admin-cert-org2
+        - mountPath: /var/hyperledger/admin_msp/signcerts
+          name: admin-cert-org2
+        - mountPath: /var/hyperledger/admin_msp/keystore
+          name: admin-key-org2
+# peer3-org2
+      - name: peer3-org2
+        image: hyperledger/fabric-tools:1.4
+        imagePullPolicy: Always
+        command:
+          - /bin/sh
+          - -c
+          - >
+            echo $GOPATH ;
+            mkdir -p $GOPATH/src/github.com/chaincode/loyalty_point/ ;
+            cp -r /shared/javascript $GOPATH/src/github.com/chaincode/loyalty_point/ ;
+            ls $GOPATH/src/github.com/chaincode/loyalty_point/javascript/ ;
+            peer chaincode install -n ${CHAINCODE_NAME} -l ${LANGUAGE} -v ${CHAINCODE_VERSION} -p /opt/gopath/src/github.com/chaincode/loyalty_point/javascript/
+        envFrom:
+        - configMapRef:
+            name: chaincode-cm
+        env:
+        # - name: CHAINCODE_NAME
+        #   value: "mycc"
+        # - name: LANGUAGE
+        #   value: "node"
+        # - name: CHAINCODE_VERSION
+        #   value: "1.0.0"
+        - name: FABRIC_CFG_PATH
+          value: /etc/hyperledger/fabric
+        - name: CORE_PEER_MSPCONFIGPATH
+          value: /var/hyperledger/admin_msp
+        - name: CORE_PEER_LOCALMSPID
+          value: Org2MSP
+        - name: CORE_PEER_ADDRESS
+          value: peer3-org2-hlf-peer.peers.svc.cluster.local:7051
+        - name: GODEBUG
+          value: "netdns=go"
+        volumeMounts:
+        - mountPath: /shared
+          name: sharedvolume
+        - mountPath: /var/hyperledger/admin_msp/cacerts
+          name: cacert-org2
+        - mountPath: /var/hyperledger/admin_msp/admincerts
+          name: admin-cert-org2
+        - mountPath: /var/hyperledger/admin_msp/signcerts
+          name: admin-cert-org2
+        - mountPath: /var/hyperledger/admin_msp/keystore
+          name: admin-key-org2
+# peer4-org2
+      - name: peer4-org2
+        image: hyperledger/fabric-tools:1.4
+        imagePullPolicy: Always
+        command:
+          - /bin/sh
+          - -c
+          - >
+            echo $GOPATH ;
+            mkdir -p $GOPATH/src/github.com/chaincode/loyalty_point/ ;
+            cp -r /shared/javascript $GOPATH/src/github.com/chaincode/loyalty_point/ ;
+            ls $GOPATH/src/github.com/chaincode/loyalty_point/javascript/ ;
+            peer chaincode install -n ${CHAINCODE_NAME} -l ${LANGUAGE} -v ${CHAINCODE_VERSION} -p /opt/gopath/src/github.com/chaincode/loyalty_point/javascript/
+        envFrom:
+        - configMapRef:
+            name: chaincode-cm
+        env:
+        # - name: CHAINCODE_NAME
+        #   value: "mycc"
+        # - name: LANGUAGE
+        #   value: "node"
+        # - name: CHAINCODE_VERSION
+        #   value: "1.0.0"
+        - name: FABRIC_CFG_PATH
+          value: /etc/hyperledger/fabric
+        - name: CORE_PEER_MSPCONFIGPATH
+          value: /var/hyperledger/admin_msp
+        - name: CORE_PEER_LOCALMSPID
+          value: Org2MSP
+        - name: CORE_PEER_ADDRESS
+          value: peer4-org2-hlf-peer.peers.svc.cluster.local:7051
         - name: GODEBUG
           value: "netdns=go"
         volumeMounts:

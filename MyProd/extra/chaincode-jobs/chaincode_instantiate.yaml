@@ -10,9 +10,7 @@ spec:
     spec:
       restartPolicy: "Never"
       volumes:
-      - name: sharedvolume
-        persistentVolumeClaim:
-          claimName: shared-pvc
+# org1
       - name: cacert-org1
         secret:
           defaultMode: 420
@@ -25,8 +23,24 @@ spec:
         secret:
           defaultMode: 420
           secretName: hlf--peer-org1-adminkey
+# org2
+      - name: cacert-org2
+        secret:
+          defaultMode: 420
+          secretName: hlf--peer-org2-ca-cert
+      - name: admin-cert-org2
+        secret:
+          defaultMode: 420
+          secretName: hlf--peer-org2-admincert
+      - name: admin-key-org2
+        secret:
+          defaultMode: 420
+          secretName: hlf--peer-org2-adminkey
+
       containers:
-      - name: chaincodeinstantiate
+########### Org1
+# peer1-org1
+      - name: peer1-org1
         image: hyperledger/fabric-tools:1.4
         imagePullPolicy: Always
         command:
@@ -57,8 +71,6 @@ spec:
         - name: GODEBUG
           value: "netdns=go"
         volumeMounts:
-        - mountPath: /shared
-          name: sharedvolume
         - mountPath: /var/hyperledger/admin_msp/cacerts
           name: cacert-org1
         - mountPath: /var/hyperledger/admin_msp/admincerts
@@ -67,3 +79,284 @@ spec:
           name: admin-cert-org1
         - mountPath: /var/hyperledger/admin_msp/keystore
           name: admin-key-org1
+# peer2-org1
+      - name: peer2-org1
+        image: hyperledger/fabric-tools:1.4
+        imagePullPolicy: Always
+        command:
+          - /bin/sh
+          - -c
+          - >
+            peer chaincode instantiate -o ord1-hlf-ord.orderers.svc.cluster.local:7050 -C ${CHANNEL_NAME} -n ${CHAINCODE_NAME} -l ${LANGUAGE} -v ${CHAINCODE_VERSION} -c '{"Args":[]}' -P "AND ('Org1MSP.member','Org2MSP.member')"
+        envFrom:
+        - configMapRef:
+            name: chaincode-cm
+        env:
+        # - name: CHANNEL_NAME
+        #   value: mychannel
+        # - name: LANGUAGE
+        #   value: "node"
+        # - name: CHAINCODE_NAME
+        #   value: "myccnew"
+        # - name: CHAINCODE_VERSION
+        #   value: "1.0.0"
+        - name: FABRIC_CFG_PATH
+          value: /etc/hyperledger/fabric
+        - name: CORE_PEER_MSPCONFIGPATH
+          value: /var/hyperledger/admin_msp
+        - name: CORE_PEER_LOCALMSPID
+          value: Org1MSP
+        - name: CORE_PEER_ADDRESS
+          value: peer2-org1-hlf-peer.peers.svc.cluster.local:7051
+        - name: GODEBUG
+          value: "netdns=go"
+        volumeMounts:
+        - mountPath: /var/hyperledger/admin_msp/cacerts
+          name: cacert-org1
+        - mountPath: /var/hyperledger/admin_msp/admincerts
+          name: admin-cert-org1
+        - mountPath: /var/hyperledger/admin_msp/signcerts
+          name: admin-cert-org1
+        - mountPath: /var/hyperledger/admin_msp/keystore
+          name: admin-key-org1
+# peer3-org1
+      - name: peer3-org1
+        image: hyperledger/fabric-tools:1.4
+        imagePullPolicy: Always
+        command:
+          - /bin/sh
+          - -c
+          - >
+            peer chaincode instantiate -o ord1-hlf-ord.orderers.svc.cluster.local:7050 -C ${CHANNEL_NAME} -n ${CHAINCODE_NAME} -l ${LANGUAGE} -v ${CHAINCODE_VERSION} -c '{"Args":[]}' -P "AND ('Org1MSP.member','Org2MSP.member')"
+        envFrom:
+        - configMapRef:
+            name: chaincode-cm
+        env:
+        # - name: CHANNEL_NAME
+        #   value: mychannel
+        # - name: LANGUAGE
+        #   value: "node"
+        # - name: CHAINCODE_NAME
+        #   value: "myccnew"
+        # - name: CHAINCODE_VERSION
+        #   value: "1.0.0"
+        - name: FABRIC_CFG_PATH
+          value: /etc/hyperledger/fabric
+        - name: CORE_PEER_MSPCONFIGPATH
+          value: /var/hyperledger/admin_msp
+        - name: CORE_PEER_LOCALMSPID
+          value: Org1MSP
+        - name: CORE_PEER_ADDRESS
+          value: peer3-org1-hlf-peer.peers.svc.cluster.local:7051
+        - name: GODEBUG
+          value: "netdns=go"
+        volumeMounts:
+        - mountPath: /var/hyperledger/admin_msp/cacerts
+          name: cacert-org1
+        - mountPath: /var/hyperledger/admin_msp/admincerts
+          name: admin-cert-org1
+        - mountPath: /var/hyperledger/admin_msp/signcerts
+          name: admin-cert-org1
+        - mountPath: /var/hyperledger/admin_msp/keystore
+          name: admin-key-org1
+# peer4-org1
+      - name: peer4-org1
+        image: hyperledger/fabric-tools:1.4
+        imagePullPolicy: Always
+        command:
+          - /bin/sh
+          - -c
+          - >
+            peer chaincode instantiate -o ord1-hlf-ord.orderers.svc.cluster.local:7050 -C ${CHANNEL_NAME} -n ${CHAINCODE_NAME} -l ${LANGUAGE} -v ${CHAINCODE_VERSION} -c '{"Args":[]}' -P "AND ('Org1MSP.member','Org2MSP.member')"
+        envFrom:
+        - configMapRef:
+            name: chaincode-cm
+        env:
+        # - name: CHANNEL_NAME
+        #   value: mychannel
+        # - name: LANGUAGE
+        #   value: "node"
+        # - name: CHAINCODE_NAME
+        #   value: "myccnew"
+        # - name: CHAINCODE_VERSION
+        #   value: "1.0.0"
+        - name: FABRIC_CFG_PATH
+          value: /etc/hyperledger/fabric
+        - name: CORE_PEER_MSPCONFIGPATH
+          value: /var/hyperledger/admin_msp
+        - name: CORE_PEER_LOCALMSPID
+          value: Org1MSP
+        - name: CORE_PEER_ADDRESS
+          value: peer4-org1-hlf-peer.peers.svc.cluster.local:7051
+        - name: GODEBUG
+          value: "netdns=go"
+        volumeMounts:
+        - mountPath: /var/hyperledger/admin_msp/cacerts
+          name: cacert-org1
+        - mountPath: /var/hyperledger/admin_msp/admincerts
+          name: admin-cert-org1
+        - mountPath: /var/hyperledger/admin_msp/signcerts
+          name: admin-cert-org1
+        - mountPath: /var/hyperledger/admin_msp/keystore
+          name: admin-key-org1
+########### Org2
+# peer1-org2
+      - name: peer1-org2
+        image: hyperledger/fabric-tools:1.4
+        imagePullPolicy: Always
+        command:
+          - /bin/sh
+          - -c
+          - >
+            peer chaincode instantiate -o ord1-hlf-ord.orderers.svc.cluster.local:7050 -C ${CHANNEL_NAME} -n ${CHAINCODE_NAME} -l ${LANGUAGE} -v ${CHAINCODE_VERSION} -c '{"Args":[]}' -P "AND ('Org1MSP.member','Org2MSP.member')"
+        envFrom:
+        - configMapRef:
+            name: chaincode-cm
+        env:
+        # - name: CHANNEL_NAME
+        #   value: mychannel
+        # - name: LANGUAGE
+        #   value: "node"
+        # - name: CHAINCODE_NAME
+        #   value: "myccnew"
+        # - name: CHAINCODE_VERSION
+        #   value: "1.0.0"
+        - name: FABRIC_CFG_PATH
+          value: /etc/hyperledger/fabric
+        - name: CORE_PEER_MSPCONFIGPATH
+          value: /var/hyperledger/admin_msp
+        - name: CORE_PEER_LOCALMSPID
+          value: Org2MSP
+        - name: CORE_PEER_ADDRESS
+          value: peer1-org2-hlf-peer.peers.svc.cluster.local:7051
+        - name: GODEBUG
+          value: "netdns=go"
+        volumeMounts:
+        - mountPath: /var/hyperledger/admin_msp/cacerts
+          name: cacert-org2
+        - mountPath: /var/hyperledger/admin_msp/admincerts
+          name: admin-cert-org2
+        - mountPath: /var/hyperledger/admin_msp/signcerts
+          name: admin-cert-org2
+        - mountPath: /var/hyperledger/admin_msp/keystore
+          name: admin-key-org2
+# peer2-org2
+      - name: peer2-org2
+        image: hyperledger/fabric-tools:1.4
+        imagePullPolicy: Always
+        command:
+          - /bin/sh
+          - -c
+          - >
+            peer chaincode instantiate -o ord1-hlf-ord.orderers.svc.cluster.local:7050 -C ${CHANNEL_NAME} -n ${CHAINCODE_NAME} -l ${LANGUAGE} -v ${CHAINCODE_VERSION} -c '{"Args":[]}' -P "AND ('Org1MSP.member','Org2MSP.member')"
+        envFrom:
+        - configMapRef:
+            name: chaincode-cm
+        env:
+        # - name: CHANNEL_NAME
+        #   value: mychannel
+        # - name: LANGUAGE
+        #   value: "node"
+        # - name: CHAINCODE_NAME
+        #   value: "myccnew"
+        # - name: CHAINCODE_VERSION
+        #   value: "1.0.0"
+        - name: FABRIC_CFG_PATH
+          value: /etc/hyperledger/fabric
+        - name: CORE_PEER_MSPCONFIGPATH
+          value: /var/hyperledger/admin_msp
+        - name: CORE_PEER_LOCALMSPID
+          value: Org2MSP
+        - name: CORE_PEER_ADDRESS
+          value: peer2-org2-hlf-peer.peers.svc.cluster.local:7051
+        - name: GODEBUG
+          value: "netdns=go"
+        volumeMounts:
+        - mountPath: /var/hyperledger/admin_msp/cacerts
+          name: cacert-org2
+        - mountPath: /var/hyperledger/admin_msp/admincerts
+          name: admin-cert-org2
+        - mountPath: /var/hyperledger/admin_msp/signcerts
+          name: admin-cert-org2
+        - mountPath: /var/hyperledger/admin_msp/keystore
+          name: admin-key-org2
+# peer3-org2
+      - name: peer3-org2
+        image: hyperledger/fabric-tools:1.4
+        imagePullPolicy: Always
+        command:
+          - /bin/sh
+          - -c
+          - >
+            peer chaincode instantiate -o ord1-hlf-ord.orderers.svc.cluster.local:7050 -C ${CHANNEL_NAME} -n ${CHAINCODE_NAME} -l ${LANGUAGE} -v ${CHAINCODE_VERSION} -c '{"Args":[]}' -P "AND ('Org1MSP.member','Org2MSP.member')"
+        envFrom:
+        - configMapRef:
+            name: chaincode-cm
+        env:
+        # - name: CHANNEL_NAME
+        #   value: mychannel
+        # - name: LANGUAGE
+        #   value: "node"
+        # - name: CHAINCODE_NAME
+        #   value: "myccnew"
+        # - name: CHAINCODE_VERSION
+        #   value: "1.0.0"
+        - name: FABRIC_CFG_PATH
+          value: /etc/hyperledger/fabric
+        - name: CORE_PEER_MSPCONFIGPATH
+          value: /var/hyperledger/admin_msp
+        - name: CORE_PEER_LOCALMSPID
+          value: Org2MSP
+        - name: CORE_PEER_ADDRESS
+          value: peer3-org2-hlf-peer.peers.svc.cluster.local:7051
+        - name: GODEBUG
+          value: "netdns=go"
+        volumeMounts:
+        - mountPath: /var/hyperledger/admin_msp/cacerts
+          name: cacert-org2
+        - mountPath: /var/hyperledger/admin_msp/admincerts
+          name: admin-cert-org2
+        - mountPath: /var/hyperledger/admin_msp/signcerts
+          name: admin-cert-org2
+        - mountPath: /var/hyperledger/admin_msp/keystore
+          name: admin-key-org2
+# peer4-org2
+      - name: peer4-org2
+        image: hyperledger/fabric-tools:1.4
+        imagePullPolicy: Always
+        command:
+          - /bin/sh
+          - -c
+          - >
+            peer chaincode instantiate -o ord1-hlf-ord.orderers.svc.cluster.local:7050 -C ${CHANNEL_NAME} -n ${CHAINCODE_NAME} -l ${LANGUAGE} -v ${CHAINCODE_VERSION} -c '{"Args":[]}' -P "AND ('Org1MSP.member','Org2MSP.member')"
+        envFrom:
+        - configMapRef:
+            name: chaincode-cm
+        env:
+        # - name: CHANNEL_NAME
+        #   value: mychannel
+        # - name: LANGUAGE
+        #   value: "node"
+        # - name: CHAINCODE_NAME
+        #   value: "myccnew"
+        # - name: CHAINCODE_VERSION
+        #   value: "1.0.0"
+        - name: FABRIC_CFG_PATH
+          value: /etc/hyperledger/fabric
+        - name: CORE_PEER_MSPCONFIGPATH
+          value: /var/hyperledger/admin_msp
+        - name: CORE_PEER_LOCALMSPID
+          value: Org2MSP
+        - name: CORE_PEER_ADDRESS
+          value: peer4-org2-hlf-peer.peers.svc.cluster.local:7051
+        - name: GODEBUG
+          value: "netdns=go"
+        volumeMounts:
+        - mountPath: /var/hyperledger/admin_msp/cacerts
+          name: cacert-org2
+        - mountPath: /var/hyperledger/admin_msp/admincerts
+          name: admin-cert-org2
+        - mountPath: /var/hyperledger/admin_msp/signcerts
+          name: admin-cert-org2
+        - mountPath: /var/hyperledger/admin_msp/keystore
+          name: admin-key-org2

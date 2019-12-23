@@ -1,5 +1,6 @@
 #!/bin/bash
 export PROD_DIR="./"
+export JOIN_PEERS="1 2 3 4"
 
 if [[ ! -d ${PROD_DIR}/config/MyConfig ]] ; then
     echo "Custom Values Store Creating...!"
@@ -9,6 +10,7 @@ fi
 #######################################
 ## Cloud Provider
 function Cloud_Provider() {
+
     export CLOUD_PROVIDER=""
     until [[ ${CLOUD_PROVIDER} == "AWS" ]] || [[ ${CLOUD_PROVIDER} == "Azure" ]] ; do
         echo "Enter Either AWS or Azure"
@@ -21,6 +23,7 @@ function Cloud_Provider() {
 #######################################
 ## Chaincode location finder
 function CC_Provider() {
+
     export CC_LOCATION=""
     until [[ -d ${CC_LOCATION} ]] ; do
         echo "${CC_LOCATION} is not a directory"
@@ -34,6 +37,7 @@ function CC_Provider() {
 #######################################
 ## helm and tiller
 function Helm_Configure() {
+
     echo "Configuring Helm in the k8s..!"
     # kubectl create -f helm-rbac.yaml
     # helm init --service-account tiller
@@ -49,6 +53,7 @@ function Helm_Configure() {
 #######################################
 ## configure storageclass
 function Storageclass_Configure() {
+
     Cloud_Provider
     echo "Configuring custom Fast storage class for the deployment...!"
     if [[ ${CLOUD_PROVIDER} == "AWS" ]] ; then 
@@ -99,6 +104,7 @@ function Storageclass_Configure() {
 #######################################
 ## NGINX Ingress controller
 function Nginx_Configure() {
+
     echo "Configure Ingress server for the deployment...!"
     Setup_Namespace ingress-controller
     helm install stable/nginx-ingress -n nginx-ingress ${namespace_options}
@@ -109,6 +115,7 @@ function Nginx_Configure() {
 #######################################
 ## Check pod status
 function Pod_Status_Wait() {
+
     echo "Checking pod status on : ${namespace_options} for the pod : ${1}"
     Pod_Name=$(kubectl ${namespace_options} get pods ${1} | awk '{if(NR>1)print $1}')
 
@@ -126,25 +133,31 @@ function Pod_Status_Wait() {
 #######################################
 ## Check job status
 function Job_Status_Wait() {
+
+    unset JOB_WAIT_STATUS
     echo "Checking pod status on : ${namespace_options} for the job : ${1}"
     if kubectl ${namespace_options} get jobs | grep ${1} ; then
         if [[ ${2} == "dontkill" ]] ; then
-            echo -e "/n break option enabled /n"
+            echo -e "\n break option enabled \n"
         fi
-
         JOBSTATUS=""
         PODSTATUS=""
+        PODNUM=""
         while [ "${JOBSTATUS}" != "1/1" ]; do
             echo "Waiting for ${1} job to be completed"
             sleep 1;
-            if [[ ${PODSTATUS} == "Error" ]] && [[ ${2} == "dontkill" ]] ; then
-                echo "Job ${1} Failed and loop breaking...!"
-                break
-            elif [[ ${PODSTATUS} == "Error" ]] ; then
-                echo "Job ${1} Failed"
-                exit 1
+            if [[ ${PODSTATUS} == "Error" ]] && [[ ${PODNUM} -eq 2 ]] ; then
+                if [[ ${PODSTATUS} == "Error" ]] && [[ ${2} == "dontkill" ]] ; then
+                    echo "Job ${1} Failed and loop breaking...!"
+                    export JOB_WAIT_STATUS=break
+                    break
+                elif [[ ${PODSTATUS} == "Error" ]] ; then
+                    echo "Job ${1} Failed"
+                    exit 1
+                fi
             fi
             JOBSTATUS=$(kubectl ${namespace_options} get jobs | grep ${1} | awk '{print $2}')
+            PODNUM=$(kubectl ${namespace_options} get pods --sort-by='{.metadata.creationTimestamp}' | grep ${1} | wc -l)
             PODSTATUS=$(kubectl ${namespace_options} get pods --sort-by='{.metadata.creationTimestamp}' | grep ${1} | awk '{print $3}' | tail -1)
         done
         echo "job ${1} Completed Successfully"
@@ -158,6 +171,7 @@ function Job_Status_Wait() {
 #######################################
 ## Certificate manager
 function Cert_Manager_Configure() {
+
     echo "CA Mager Configuration...!"
     Setup_Namespace cert-manager
 
@@ -176,8 +190,8 @@ function Cert_Manager_Configure() {
 #######################################
 ## Initial setup
 function Setup_Namespace() {
-    echo "Custom NameSpace Configuration : ${1}"
 
+    echo "Custom NameSpace Configuration : ${1}"
     if [[ ${1} == "create" ]] ; then
         kubectl create ns cas
         kubectl create ns orderers
@@ -211,6 +225,7 @@ function Setup_Namespace() {
 #######################################
 ## Docker in Docker
 function Dind_Configure() {
+
     echo "Configure Dind server for the deployment...!"
     Setup_Namespace peers
     helm install ar-repo/dind -n dindserver ${namespace_options} -f ${PROD_DIR}/helm_values/dind.yaml
@@ -222,6 +237,7 @@ function Dind_Configure() {
 #######################################
 ## Chaincode storage
 function CC_Storage_Configure() {
+
     if [[ -z ${CLOUD_PROVIDER} ]] ; then
         echo "CLOUD_PROVIDER can't be empty...!"
         Cloud_Provider
@@ -245,8 +261,8 @@ function CC_Storage_Configure() {
 #######################################
 ## Initial setup
 function Choose_Env() {
-    echo "Choose Env Configuration : ${1}"
 
+    echo "Choose Env Configuration : ${1}"
     if [[ ${1} == "org_number" ]] ; then
         export ORG_NUM=""
         # until [[ "${ORG_NUM}" =~ ^[0-9]+$ ]] ; do
@@ -324,6 +340,7 @@ function Fabric_CA_Configure() {
 #######################################
 ## getting CA_INGRESS
 function Get_CA_Info() {
+
     echo "Fabric CA Info...!"
     Setup_Namespace cas
     export CA_INGRESS=$(kubectl get ingress ${namespace_options} -l "app=hlf-ca,release=ca" -o jsonpath="{.items[0].spec.rules[0].host}")
@@ -603,6 +620,7 @@ function Orderer_Conf() {
 #######################################
 ## Fabric Peer nodes Creation
 function Peer_Conf() {
+
     Choose_Env org_number
     Choose_Env peer_number
     if [[ -d ${PROD_DIR}/config/peer${PEER_NUM}-org${ORG_NUM}_MSP ]] ; then
@@ -719,35 +737,44 @@ function Create_Channel_On_Peer() {
 #######################################
 ## Join and Fetch channel
 function Join_Channel() {
+    
     Setup_Namespace peers
     Choose_Env org_number
-    Choose_Env peer_number
     Choose_Env channel_name
-
-    echo "Join Channel in peer : peer${PEER_NUM}-org${ORG_NUM}"
-    export PEER_POD=$(kubectl get pods ${namespace_options} -l "app=hlf-peer,release=peer${PEER_NUM}-org${ORG_NUM}" -o jsonpath="{.items[0].metadata.name}")
-    Pod_Status_Wait ${PEER_POD}
-    echo "Connecting with Peer : peer${PEER_NUM}-org${ORG_NUM}on pod : ${PEER_POD}"
-    echo "Fetching and joining Channel with name :: $CHANNEL_NAME on peer : peer${PEER_NUM}-org${ORG_NUM} wich has name : ${PEER_POD}"
-
-    ## Fetch and join channel
-    kubectl exec ${namespace_options} ${PEER_POD} -- rm -rf /var/hyperledger/${CHANNEL_NAME}.block
-    kubectl exec ${namespace_options} ${PEER_POD} -- peer channel fetch config /var/hyperledger/${CHANNEL_NAME}.block -c ${CHANNEL_NAME} -o ord1-hlf-ord.orderers.svc.cluster.local:7050
-    echo "kubectl exec ${namespace_options} ${PEER_POD} -- bash -c 'CORE_PEER_MSPCONFIGPATH=\$ADMIN_MSP_PATH peer channel join -b /var/hyperledger/${CHANNEL_NAME}.block'" | bash
-    echo "I'm Waiting for the peer to join to my channel...." ; sleep 5
-    if [[ $(kubectl exec ${PEER_POD} ${namespace_options} -- peer channel list | grep ${CHANNEL_NAME}) ]] ; then
-        echo "peer peer${PEER_NUM}-org${ORG_NUM} successfully joined to channel : ${CHANNEL_NAME}"
+    if [[ ! -z ${JOIN_PEERS} ]] ; then
+        export PEER_NUM=${JOIN_PEERS}
+        echo -e "\n these peers ${PEER_NUM} will join to the channel : ${CHANNEL_NAME} \n"
     else
-        echo "Channel : ${CHANNEL_NAME} not found..!, please check it manually or debug the issue..!"
-        echo "Use this command to confirm : kubectl exec ${PEER_POD} ${namespace_options} -- peer channel list | grep ${CHANNEL_NAME}"
-        exit 1
+        Choose_Env peer_number
     fi
+
+    for Peer_No in ${PEER_NUM} ; do
+        echo "Join Channel in peer : peer${Peer_No}-org${ORG_NUM}"
+        export PEER_POD=$(kubectl get pods ${namespace_options} -l "app=hlf-peer,release=peer${Peer_No}-org${ORG_NUM}" -o jsonpath="{.items[0].metadata.name}")
+        Pod_Status_Wait ${PEER_POD}
+        echo "Connecting with Peer : peer${Peer_No}-org${ORG_NUM}on pod : ${PEER_POD}"
+        echo "Fetching and joining Channel with name :: ${CHANNEL_NAME} on peer : peer${Peer_No}-org${ORG_NUM} wich has name : ${PEER_POD}"
+
+        ## Fetch and join channel
+        kubectl exec ${namespace_options} ${PEER_POD} -- rm -rf /var/hyperledger/${CHANNEL_NAME}.block
+        kubectl exec ${namespace_options} ${PEER_POD} -- peer channel fetch config /var/hyperledger/${CHANNEL_NAME}.block -c ${CHANNEL_NAME} -o ord1-hlf-ord.orderers.svc.cluster.local:7050
+        echo "kubectl exec ${namespace_options} ${PEER_POD} -- bash -c 'CORE_PEER_MSPCONFIGPATH=\$ADMIN_MSP_PATH peer channel join -b /var/hyperledger/${CHANNEL_NAME}.block'" | bash
+        echo "I'm Waiting for the peer to join to my channel...." ; sleep 5
+        if [[ $(kubectl exec ${PEER_POD} ${namespace_options} -- peer channel list | grep ${CHANNEL_NAME}) ]] ; then
+            echo "peer peer${Peer_No}-org${ORG_NUM} successfully joined to channel : ${CHANNEL_NAME}"
+        else
+            echo "Channel : ${CHANNEL_NAME} not found..!, please check it manually or debug the issue..!"
+            echo "Use this command to confirm : kubectl exec ${PEER_POD} ${namespace_options} -- peer channel list | grep ${CHANNEL_NAME}"
+            exit 1
+        fi
+    done
 }
 
 
 #######################################
 ## Chaincode versioning
 function CC_Version() {
+
     CC_Provider
     Setup_Namespace peers
     export CC_LOCATION_BASENAME=$(basename ${CC_LOCATION})
@@ -755,7 +782,8 @@ function CC_Version() {
     export ORG_NUM=1
 
     kubectl ${namespace_options} apply -f ${PROD_DIR}/extra/Chaincode-Jobs/chaincode-ConfigMap.yaml
-    CHAINCODE_NAME=$(kubectl ${namespace_options} get configmap chaincode-cm -o yaml | grep "CHAINCODE_NAME:" | awk '{print $2}')
+    CHAINCODE_NAME=$(kubectl ${namespace_options} get configmap chaincode-cm -o jsonpath="{.data.CHAINCODE_NAME}")
+    CHANNEL_NAME=$(kubectl ${namespace_options} get configmap chaincode-cm -o jsonpath="{.data.CHANNEL_NAME}")
 
     if [[ -z ${CHAINCODE_NAME} ]] ; then
         export CHAINCODE_NAME=mycc
@@ -766,9 +794,9 @@ function CC_Version() {
     export PEER_POD=$(kubectl get pods ${namespace_options} -l "app=hlf-peer,release=peer${PEER_NUM}-org${ORG_NUM}" -o jsonpath="{.items[0].metadata.name}")
     Pod_Status_Wait ${PEER_POD}
 
-    if echo "kubectl exec ${namespace_options} ${PEER_POD} -- bash -c 'CORE_PEER_MSPCONFIGPATH=\$ADMIN_MSP_PATH peer chaincode list --installed'" | bash | grep "${CHAINCODE_NAME}" ; then
+    if echo "kubectl exec ${namespace_options} ${PEER_POD} -- bash -c 'CORE_PEER_MSPCONFIGPATH=\$ADMIN_MSP_PATH peer chaincode list --instantiated -C ${CHANNEL_NAME}'" | bash | grep ${CHAINCODE_NAME} ; then
         echo -e "chaincode with name : ${CHAINCODE_NAME} installed...\n checking the version"
-        export CHAINCODE_OLD_VER=$(echo "kubectl exec ${namespace_options} ${PEER_POD} -- bash -c 'CORE_PEER_MSPCONFIGPATH=\$ADMIN_MSP_PATH peer chaincode list --installed'" | bash | grep "${CHAINCODE_NAME}" | tail -1 | grep "Version:" | awk '{print $4}' | cut -f1 -d",")
+        export CHAINCODE_OLD_VER=$(echo "kubectl exec ${namespace_options} ${PEER_POD} -- bash -c 'CORE_PEER_MSPCONFIGPATH=\$ADMIN_MSP_PATH peer chaincode list --instantiated -C ${CHANNEL_NAME}'" | bash | tail -1 | grep "Version:" | awk '{print $4}' | cut -f1 -d",")
         if [[ -z ${CHAINCODE_OLD_VER} ]] ; then
             export CHAINCODE_VER_SET=false
             echo "some issue while fetching the chaincode version"
@@ -815,8 +843,8 @@ function CC_Version() {
 #######################################
 ## Chaincode install
 function CC_Install() {
-    Setup_Namespace peers
 
+    Setup_Namespace peers
     ## Configuring Shared storage server for chaincode
     CC_STORAGE_POD=$(kubectl ${namespace_options} get pods -l "component=chaincodestorage,role=storage-server" -o jsonpath="{.items[0].metadata.name}")
     Pod_Status_Wait ${CC_STORAGE_POD}
@@ -849,6 +877,7 @@ function CC_Install() {
 #######################################
 ## Chaincode instantiate / upgrade
 function CC_Deploy() {
+
     Setup_Namespace peers
     if [[ ${CHAINCODE_VER_SET} == "initial" ]] ; then
         echo -e "\nCreating chaincodeinstantiate job"
@@ -857,8 +886,11 @@ function CC_Deploy() {
         fi
         kubectl ${namespace_options} apply -f ${PROD_DIR}/extra/Chaincode-Jobs/chaincode_instantiate.yaml
         Job_Status_Wait chaincodeinstantiate dontkill
-        echo -e "\n rollback initiated...! \n"
-        CC_Delete
+        if [[ ${JOB_WAIT_STATUS} == break ]] ; then
+            CC_Delete
+        else
+            kubectl exec ${namespace_options} ${DIND_POD} -- sh -c "docker stop \$(docker ps -aq)"
+        fi
     elif [[ ${CHAINCODE_VER_SET} == "update" ]] ; then
         echo -e "\nCreating chaincodeupgrade job"
         if kubectl ${namespace_options} get jobs | grep chaincodeupgrade > /dev/null 2>&1 ; then
@@ -866,8 +898,11 @@ function CC_Deploy() {
         fi
         kubectl ${namespace_options} apply -f ${PROD_DIR}/extra/Chaincode-Jobs/chaincode_upgrade.yaml
         Job_Status_Wait chaincodeupgrade dontkill
-        echo -e "\n rollback initiated...! \n"
-        CC_Delete
+        if [[ ${JOB_WAIT_STATUS} == break ]] ; then
+            CC_Delete
+        else
+            kubectl exec ${namespace_options} ${DIND_POD} -- sh -c "docker stop \$(docker ps -aq)"
+        fi
     else
         echo "CHAINCODE_VER_SET is empty...!"
         exit 1
@@ -878,6 +913,8 @@ function CC_Deploy() {
 #######################################
 ## Chaincode delete
 function CC_Delete() {
+
+    echo -e "\n rollback initiated...! \n"
     Setup_Namespace peers
 
     ## checking DinD server
@@ -887,7 +924,10 @@ function CC_Delete() {
     ## Configuring Shared storage server for chaincode
     CC_STORAGE_POD=$(kubectl ${namespace_options} get pods -l "component=chaincodestorage,role=storage-server" -o jsonpath="{.items[0].metadata.name}")
     Pod_Status_Wait ${CC_STORAGE_POD}
-    echo "kubectl exec ${namespace_options} ${CC_STORAGE_POD} -- rm -rf /shared/${CC_LOCATION_BASENAME}" | bash
+
+    if [[ ! -z ${CC_LOCATION_BASENAME} ]] ; then
+        echo "kubectl exec ${namespace_options} ${CC_STORAGE_POD} -- rm -rf /shared/${CC_LOCATION_BASENAME}" | bash
+    fi
 
     PEERS_PODS=$(kubectl ${namespace_options} get pods  | grep "^peer" | awk '{print $1}')
     CHAINCODE_NAME=$(kubectl ${namespace_options} get configmap chaincode-cm -o jsonpath="{.data.CHAINCODE_NAME}")
@@ -905,62 +945,113 @@ function CC_Delete() {
         else
             echo "chaincode : ${CHAINCODE_NAME} not installed on peer ${peer_pods} with version : ${CHAINCODE_VERSION}"
         fi
+        
+        ## Deleting chaincode instance
+        echo "Checking the DinD Server for chaincode for peer : ${peer_pods}"
+        PEER_CC_ID=$(echo ${peer_pods} | cut -d"-" -f1-2)
+        if [[ ! -z ${PEER_CC_ID} ]] && [[ ! -z ${CHAINCODE_NAME} ]] && [[ ! -z ${CHAINCODE_VERSION} ]] ; then
+            FILTER_CC_KEYWORD=${PEER_CC_ID}-${CHAINCODE_NAME}-${CHAINCODE_VERSION}
+            echo -e "\n looking for chaincode container having keyword : ${FILTER_CC_KEYWORD}  \n"
+            
+            if kubectl exec ${namespace_options} ${DIND_POD} -- sh -c "docker ps | grep ${FILTER_CC_KEYWORD}" ; then
+                CC_DOCKER_CONTAINER=$(kubectl exec ${namespace_options} ${DIND_POD} -- sh -c "docker ps | grep ${FILTER_CC_KEYWORD} | awk '{print $"1"}'")
+                echo -e "\n Deleting chaincode container from DinD Server \n"
+                for docker_container in ${CC_DOCKER_CONTAINER} ; do
+                    echo "Removing Chaincode docker container : ${docker_container}"
+                    kubectl exec ${namespace_options} ${DIND_POD} -- sh -c "docker rm -fv ${docker_container}"
+                done
+            else
+                echo "No Chaincode Container running for : ${PEER_CC_ID}"
+            fi
+
+            if kubectl exec ${namespace_options} ${DIND_POD} -- sh -c "docker images | grep ${FILTER_CC_KEYWORD}" ; then
+                CC_DOCKER_IMAGE=$(kubectl exec ${namespace_options} ${DIND_POD} -- sh -c "docker images | grep ${FILTER_CC_KEYWORD} | awk '{print $"3"}'")
+                echo -e "\n Deleting chaincode image from DinD Server \n"
+                for docker_image in ${CC_DOCKER_IMAGE} ; do
+                    echo "Removing Chaincode docker image : ${docker_image}"
+                    kubectl exec ${namespace_options} ${DIND_POD} -- sh -c "docker rmi -f ${docker_image}"
+                done
+            else
+                echo "No Chaincode image available for : ${PEER_CC_ID}"
+            fi
+        else
+            echo "PEER_CC_ID / CHAINCODE_NAME / CHAINCODE_VERSION : something missing....!"
+            echo -e "PEER_CC_ID=${PEER_CC_ID} \n CHAINCODE_NAME=${CHAINCODE_NAME} \n CHAINCODE_VERSION=${CHAINCODE_VERSION}"
+            exit 1
+        fi
     done
-
-
-
-
-    # echo -e "\nCreating deletechaincode job"
-    # if kubectl ${namespace_options} get jobs | grep chaincodedelete > /dev/null 2>&1 ; then
-    #     kubectl ${namespace_options} delete jobs chaincodedelete
-    # fi
-    # kubectl ${namespace_options} apply -f ${PROD_DIR}/extra/Chaincode-Jobs/chaincode_delete.yaml
-    # Job_Status_Wait chaincodedelete
 }
 
 
 #######################################
 ## List channel
 function List_Channel() {
+
     Setup_Namespace peers
     Choose_Env org_number
-    Choose_Env peer_number
+    if [[ ! -z ${JOIN_PEERS} ]] ; then
+        export PEER_NUM=${JOIN_PEERS}
+        echo -e "\n these peers ${PEER_NUM} will check to get the channel info \n"
+    else
+        Choose_Env peer_number
+    fi
 
-    export PEER_POD=$(kubectl get pods ${namespace_options} -l "app=hlf-peer,release=peer${PEER_NUM}-org${ORG_NUM}" -o jsonpath="{.items[0].metadata.name}")
-    echo "List Channels which peer : peer${PEER_NUM}-org${ORG_NUM} has joined...!"
-    kubectl exec ${PEER_POD} ${namespace_options} -- peer channel list
+    for Peer_No in ${PEER_NUM} ; do
+        echo -e "\n _-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_ \n "
+        export PEER_POD=$(kubectl get pods ${namespace_options} -l "app=hlf-peer,release=peer${Peer_No}-org${ORG_NUM}" -o jsonpath="{.items[0].metadata.name}")
+        echo -e "\n List Channels which peer : peer${Peer_No}-org${ORG_NUM} has joined...! \n"
+        kubectl exec ${PEER_POD} ${namespace_options} -- peer channel list
+    done
 }
 
 
 #######################################
 ## List Chaincode Install
 function List_Chaincode_Install() {
+
     Setup_Namespace peers
     Choose_Env org_number
-    Choose_Env peer_number
+    if [[ ! -z ${JOIN_PEERS} ]] ; then
+        export PEER_NUM=${JOIN_PEERS}
+        echo -e "\n these peers ${PEER_NUM} will check to get the chaincode install info \n"
+    else
+        Choose_Env peer_number
+    fi
     
-    export PEER_POD=$(kubectl get pods ${namespace_options} -l "app=hlf-peer,release=peer${PEER_NUM}-org${ORG_NUM}" -o jsonpath="{.items[0].metadata.name}")
-    echo "List chaincode which installed on peer : peer${PEER_NUM}-org${ORG_NUM}"
-    echo "kubectl exec ${namespace_options} ${PEER_POD} -- bash -c 'CORE_PEER_MSPCONFIGPATH=\$ADMIN_MSP_PATH peer chaincode list --installed'" | bash
+    for Peer_No in ${PEER_NUM} ; do
+        echo -e "\n _-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_ \n "
+        export PEER_POD=$(kubectl get pods ${namespace_options} -l "app=hlf-peer,release=peer${Peer_No}-org${ORG_NUM}" -o jsonpath="{.items[0].metadata.name}")
+        echo -e "\n List chaincode which installed on peer : peer${Peer_No}-org${ORG_NUM} \n"
+        echo "kubectl exec ${namespace_options} ${PEER_POD} -- bash -c 'CORE_PEER_MSPCONFIGPATH=\$ADMIN_MSP_PATH peer chaincode list --installed'" | bash
+    done
 }
 
 
 #######################################
 ## List Chaincode Instantiate
 function List_Chaincode_Instantiate() {
+
     Setup_Namespace peers
     Choose_Env org_number
-    Choose_Env peer_number
     Choose_Env channel_name
-
-    export PEER_POD=$(kubectl get pods ${namespace_options} -l "app=hlf-peer,release=peer${PEER_NUM}-org${ORG_NUM}" -o jsonpath="{.items[0].metadata.name}")
-    if kubectl exec ${PEER_POD} ${namespace_options} -- peer channel list | grep ${CHANNEL_NAME} ; then
-        echo "List chaincode which instantiated on peer : peer${PEER_NUM}-org${ORG_NUM} per on channel : ${CHANNEL_NAME}...!"
-        echo "kubectl exec ${namespace_options} ${PEER_POD} -- bash -c 'CORE_PEER_MSPCONFIGPATH=\$ADMIN_MSP_PATH peer chaincode list --instantiated -C ${CHANNEL_NAME}'" | bash
+    if [[ ! -z ${JOIN_PEERS} ]] ; then
+        export PEER_NUM=${JOIN_PEERS}
+        echo -e "\n these peers ${PEER_NUM} will check to get the chaincode install info \n"
     else
-        echo -e "channel : ${CHANNEL_NAME} not found on peer : ${PEER_POD} \n Please check the channel name or run channel-ls to list the channel...!"
-        exit 1
+        Choose_Env peer_number
     fi
+
+    for Peer_No in ${PEER_NUM} ; do
+        echo -e "\n _-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_ \n "
+        export PEER_POD=$(kubectl get pods ${namespace_options} -l "app=hlf-peer,release=peer${Peer_No}-org${ORG_NUM}" -o jsonpath="{.items[0].metadata.name}")
+        if kubectl exec ${PEER_POD} ${namespace_options} -- peer channel list | grep ${CHANNEL_NAME} > /dev/null 2>&1 ; then
+            echo -e "\n List chaincode which instantiated on peer : peer${Peer_No}-org${ORG_NUM} per on channel : ${CHANNEL_NAME}...! \n"
+            echo "kubectl exec ${namespace_options} ${PEER_POD} -- bash -c 'CORE_PEER_MSPCONFIGPATH=\$ADMIN_MSP_PATH peer chaincode list --instantiated -C ${CHANNEL_NAME}'" | bash
+        else
+            echo -e "channel : ${CHANNEL_NAME} not found on peer : ${PEER_POD} \n Please check the channel name or run channel-ls to list the channel...!"
+            exit 1
+        fi
+    done
 }
 
 
@@ -1041,7 +1132,7 @@ genesis-block       :   Genesis block creation
 channel-block       :   Creating the Channel
 orderer-create      :   Create the Orderers certs and configure it in the K8s secrets, Deploying the Orderers nodes on namespace orderers
 peer-create         :   Create the Orderers certs and configure it in the K8s secrets, Deploying the Peers nodes on namespace peers
-channel-create      :   One time configuraiton on first peer (peer-org1-1 / peer-org2-1) on each organisation ; Creating the channel in one peer
+channel-create      :   One time configuraiton on first peer (peer1-org1 / peer1-org2) on each organisation ; Creating the channel in one peer
 channel-join        :   Join to the channel which we created before
 cc-deploy           :   Install / Instantiate / Upgrade chaincode
 cc-delete           :   Delete the latest version of installed chaincode
