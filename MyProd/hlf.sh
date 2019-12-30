@@ -922,7 +922,7 @@ function CC_Delete() {
     export DIND_POD=$(kubectl ${namespace_options} get pods -l "app=dind" -o jsonpath="{.items[0].metadata.name}")
     Pod_Status_Wait ${DIND_POD}
 
-    ## Configuring Shared storage server for chaincode
+    ## checking Shared storage server for chaincode
     CC_STORAGE_POD=$(kubectl ${namespace_options} get pods -l "component=chaincodestorage,role=storage-server" -o jsonpath="{.items[0].metadata.name}")
     Pod_Status_Wait ${CC_STORAGE_POD}
 
@@ -954,8 +954,8 @@ function CC_Delete() {
             FILTER_CC_KEYWORD=${PEER_CC_ID}-${CHAINCODE_NAME}-${CHAINCODE_VERSION}
             echo -e "\n looking for chaincode container having keyword : ${FILTER_CC_KEYWORD}  \n"
             
-            if kubectl exec ${namespace_options} ${DIND_POD} -- sh -c "docker ps | grep ${FILTER_CC_KEYWORD}" ; then
-                CC_DOCKER_CONTAINER=$(kubectl exec ${namespace_options} ${DIND_POD} -- sh -c "docker ps | grep ${FILTER_CC_KEYWORD} | awk '{print $"1"}'")
+            if kubectl exec ${namespace_options} ${DIND_POD} -- sh -c "docker ps -a | grep ${FILTER_CC_KEYWORD}" ; then
+                CC_DOCKER_CONTAINER=$(kubectl exec ${namespace_options} ${DIND_POD} -- sh -c "docker ps -a | grep ${FILTER_CC_KEYWORD} | awk '{print $"1"}'")
                 echo -e "\n Deleting chaincode container from DinD Server \n"
                 for docker_container in ${CC_DOCKER_CONTAINER} ; do
                     echo "Removing Chaincode docker container : ${docker_container}"
