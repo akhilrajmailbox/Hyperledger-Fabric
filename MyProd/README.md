@@ -391,6 +391,7 @@ List all channels which a particular peer has joined.
 ./hlf.sh -o peer-create ---> (Create "N" Number of peers for "N" Orderers == "N*N")
 ./hlf.sh -o channel-create (One time configuration, run this only on one peer per Organisation [ peer-org1-1 / peer-org2-1 ])
 ./hlf.sh -o channel-join ---> (Run on "N" Peers on all Organisation)
+./hlf.sh -o anchor-config
 ./hlf.sh -o cc-deploy
 ./hlf.sh -o channel-ls
 ./hlf.sh -o cc-install-ls 

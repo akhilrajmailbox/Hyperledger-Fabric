@@ -1,0 +1,170 @@
+{
+	"name": "first-network-org${ORG}",
+	"version": "1.0.0",
+	"client": {
+		"organization": "Org${ORG}",
+		"connection": {
+			"timeout": {
+				"peer": {
+					"endorser": "300"
+				}
+			}
+		}
+	},
+	"organizations": {
+		"Org${ORG}": {
+			"mspid": "Org${ORG}MSP",
+			"peers": [
+				"peer1-org${ORG}-hlf-peer.peers.svc.cluster.local",
+				"peer2-org${ORG}-hlf-peer.peers.svc.cluster.local",
+				"peer3-org${ORG}-hlf-peer.peers.svc.cluster.local",
+				"peer4-org${ORG}-hlf-peer.peers.svc.cluster.local"
+			],
+			"certificateAuthorities": [
+				"${CA_INGRESS}"
+			]
+		}
+	},
+    "channels": {
+        "${CHANNEL_NAME}": {
+            "orderers": [
+				"ord1-hlf-ord.orderers.svc.cluster.local",
+				"ord2-hlf-ord.orderers.svc.cluster.local",
+				"ord3-hlf-ord.orderers.svc.cluster.local",
+				"ord4-hlf-ord.orderers.svc.cluster.local",
+				"ord5-hlf-ord.orderers.svc.cluster.local"
+            ],
+            "peers": {
+                "peer1-org${ORG}-hlf-peer.peers.svc.cluster.local": {
+                    "endorsingPeer": true,
+                    "chaincodeQuery": true,
+                    "ledgerQuery": true,
+                    "eventSource": true,
+                    "discover": true
+				},
+				"peer2-org${ORG}-hlf-peer.peers.svc.cluster.local": {
+                    "endorsingPeer": true,
+                    "chaincodeQuery": true,
+                    "ledgerQuery": true,
+                    "eventSource": true,
+                    "discover": true
+                },
+				"peer3-org${ORG}-hlf-peer.peers.svc.cluster.local": {
+                    "endorsingPeer": true,
+                    "chaincodeQuery": true,
+                    "ledgerQuery": true,
+                    "eventSource": true,
+                    "discover": true
+                },
+				"peer4-org${ORG}-hlf-peer.peers.svc.cluster.local": {
+                    "endorsingPeer": true,
+                    "chaincodeQuery": true,
+                    "ledgerQuery": true,
+                    "eventSource": true,
+                    "discover": true
+                }
+            }
+        }
+    },
+    "orderers": {
+        "ord1-hlf-ord.orderers.svc.cluster.local": {
+            "url": "grpc://ord1-hlf-ord.orderers.svc.cluster.local:7050",
+            "grpcOptions": {
+                "ssl-target-name-override": "ord1-hlf-ord.orderers.svc.cluster.local"
+            },
+            "tlsCACerts": {
+                "pem": "${ORDPEM}"
+            }
+		},
+		"ord2-hlf-ord.orderers.svc.cluster.local": {
+            "url": "grpc://ord2-hlf-ord.orderers.svc.cluster.local:7050",
+            "grpcOptions": {
+                "ssl-target-name-override": "ord2-hlf-ord.orderers.svc.cluster.local"
+            },
+            "tlsCACerts": {
+                "pem": "${ORDPEM}"
+            }
+		},
+		"ord3-hlf-ord.orderers.svc.cluster.local": {
+            "url": "grpc://ord3-hlf-ord.orderers.svc.cluster.local:7050",
+            "grpcOptions": {
+                "ssl-target-name-override": "ord3-hlf-ord.orderers.svc.cluster.local"
+            },
+            "tlsCACerts": {
+                "pem": "${ORDPEM}"
+            }
+		},
+		"ord4-hlf-ord.orderers.svc.cluster.local": {
+            "url": "grpc://ord4-hlf-ord.orderers.svc.cluster.local:7050",
+            "grpcOptions": {
+                "ssl-target-name-override": "ord4-hlf-ord.orderers.svc.cluster.local"
+            },
+            "tlsCACerts": {
+                "pem": "${ORDPEM}"
+            }
+		},
+		"ord5-hlf-ord.orderers.svc.cluster.local": {
+            "url": "grpc://ord5-hlf-ord.orderers.svc.cluster.local:7050",
+            "grpcOptions": {
+                "ssl-target-name-override": "ord5-hlf-ord.orderers.svc.cluster.local"
+            },
+            "tlsCACerts": {
+                "pem": "${ORDPEM}"
+            }
+        }
+    },
+	"peers": {
+		"peer1-org${ORG}-hlf-peer.peers.svc.cluster.local": {
+			"url": "grpc://peer1-org${ORG}-hlf-peer.peers.svc.cluster.local:${PPORT}",
+			"tlsCACerts": {
+				"pem": "${PEERPEM}"
+			},
+			"grpcOptions": {
+				"ssl-target-name-override": "peer1-org${ORG}-hlf-peer.peers.svc.cluster.local",
+				"hostnameOverride": "peer1-org${ORG}-hlf-peer.peers.svc.cluster.local"
+			}
+		},
+		"peer2-org${ORG}-hlf-peer.peers.svc.cluster.local": {
+			"url": "grpc://peer2-org${ORG}-hlf-peer.peers.svc.cluster.local:${PPORT}",
+			"tlsCACerts": {
+				"pem": "${PEERPEM}"
+			},
+			"grpcOptions": {
+				"ssl-target-name-override": "peer2-org${ORG}-hlf-peer.peers.svc.cluster.local",
+				"hostnameOverride": "peer2-org${ORG}-hlf-peer.peers.svc.cluster.local"
+			}
+		},
+		"peer3-org${ORG}-hlf-peer.peers.svc.cluster.local": {
+			"url": "grpc://peer3-org${ORG}-hlf-peer.peers.svc.cluster.local:${PPORT}",
+			"tlsCACerts": {
+				"pem": "${PEERPEM}"
+			},
+			"grpcOptions": {
+				"ssl-target-name-override": "peer3-org${ORG}-hlf-peer.peers.svc.cluster.local",
+				"hostnameOverride": "peer3-org${ORG}-hlf-peer.peers.svc.cluster.local"
+			}
+		},
+		"peer4-org${ORG}-hlf-peer.peers.svc.cluster.local": {
+			"url": "grpc://peer4-org${ORG}-hlf-peer.peers.svc.cluster.local:${PPORT}",
+			"tlsCACerts": {
+				"pem": "${PEERPEM}"
+			},
+			"grpcOptions": {
+				"ssl-target-name-override": "peer4-org${ORG}-hlf-peer.peers.svc.cluster.local",
+				"hostnameOverride": "peer4-org${ORG}-hlf-peer.peers.svc.cluster.local"
+			}
+		}
+	},
+	"certificateAuthorities": {
+		"${CA_INGRESS}": {
+			"url": "https://${CA_INGRESS}:443",
+			"caName": "${CA_NAME}",
+			"tlsCACerts": {
+				"pem": "${CAPEM}"
+			},
+			"httpOptions": {
+				"verify": false
+			}
+		}
+	}
+}

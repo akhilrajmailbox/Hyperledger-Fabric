@@ -1,6 +1,16 @@
 #!/bin/bash
-export PROD_DIR="./"
+type kubectl >/dev/null 2>&1 || { echo >&2 "CRITICAL: The kubectl is required for this script to run"; exit 2; }
+type helm >/dev/null 2>&1 || { echo >&2 "CRITICAL: The helm client is required for this script to run"; exit 2; }
+type envsubst >/dev/null 2>&1 || { echo >&2 "CRITICAL: The envsubst utility is required for this script to run"; exit 2; }
+
+
+export P_W_D=$PWD ; cd ./
+export PROD_DIR="$PWD"
+cd ${P_W_D}
+
 export CUSTOM_PEERS="1 2 3 4"
+export ANCHOR_PEERS="1 2"
+export CUSTOM_ORG_NUMS="1 2"
 
 if [[ ! -d ${PROD_DIR}/config/MyConfig ]] ; then
     echo "Custom Values Store Creating...!"
@@ -38,17 +48,19 @@ function CC_Provider() {
 ## helm and tiller
 function Helm_Configure() {
 
+    Setup_Namespace kube-system
     echo "Configuring Helm in the k8s..!"
     # kubectl create -f helm-rbac.yaml
-    # helm init --service-account tiller
-    kubectl create serviceaccount --namespace kube-system tiller
+    kubectl create serviceaccount ${namespace_options} tiller
     kubectl create clusterrolebinding tiller-cluster-rule --clusterrole=cluster-admin --serviceaccount=kube-system:tiller
-    kubectl patch deploy --namespace kube-system tiller-deploy -p '{"spec":{"template":{"spec":{"serviceAccount":"tiller"}}}}'      
-    helm init --service-account tiller --upgrade
-    sleep 10
+    helm init --service-account tiller
+    # kubectl patch deploy ${namespace_options} tiller-deploy -p '{"spec":{"template":{"spec":{"serviceAccount":"tiller"}}}}'
+    # helm init --service-account tiller --upgrade
+    TILLER_POD=$(kubectl ${namespace_options} get pods -l "name=tiller" -o jsonpath="{.items[0].metadata.name}")
+    Pod_Status_Wait ${TILLER_POD}
+    sleep 5
     helm repo add ar-repo https://akhilrajmailbox.github.io/Hyperledger-Fabric/docs
 }
-
 
 #######################################
 ## configure storageclass
@@ -214,6 +226,10 @@ function Setup_Namespace() {
         echo ${namespace_options}
     elif [[ ${1} == "ingress-controller" ]] ; then
         export K8S_NAMESPACE=ingress-controller
+        namespace_options="--namespace=${K8S_NAMESPACE}"
+        echo ${namespace_options}
+    elif [[ ${1} == "kube-system" ]] ; then
+        export K8S_NAMESPACE=kube-system
         namespace_options="--namespace=${K8S_NAMESPACE}"
         echo ${namespace_options}
     else
@@ -543,6 +559,22 @@ function Channel_Create() {
         configtxgen -profile ${CHANNEL_OPT} -channelID ${CHANNEL_NAME} -outputCreateChannelTx ./${CHANNEL_NAME}.tx
         ## Save them as secrets
         kubectl create secret generic ${namespace_options} hlf--channel --from-file=${CHANNEL_NAME}.tx
+
+        if [[ ! -z ${CUSTOM_ORG_NUMS} ]] ; then
+            echo -e "\n these Org ${CUSTOM_ORG_NUMS} will use for AnchorPeersUpdate \n"
+            for CUSTOM_ORG_NUM in ${CUSTOM_ORG_NUMS} ; do
+                echo ""
+                echo "#################################################################"
+                echo "#######    Generating anchor peer update for Org${CUSTOM_ORG_NUM}MSP   ##########"
+                echo "#################################################################"
+                echo ""
+                configtxgen -profile ${CHANNEL_OPT} -outputAnchorPeersUpdate ./Org${CUSTOM_ORG_NUM}MSPanchors.tx -channelID ${CHANNEL_NAME} -asOrg Org${CUSTOM_ORG_NUM}MSP
+                echo ""
+            done
+        else
+            echo -e "\n CUSTOM_ORG_NUM must specified...! \n"
+            exit 1
+        fi
         cd ${P_W_D}
     fi
 }
@@ -768,6 +800,33 @@ function Join_Channel() {
             echo "Use this command to confirm : kubectl exec ${PEER_POD} ${namespace_options} -- peer channel list | grep ${CHANNEL_NAME}"
             exit 1
         fi
+    done
+}
+
+
+#######################################
+## Update_AnchorPeers on each Anchor peer
+function Update_AnchorPeers() {
+
+    Setup_Namespace peers
+    Choose_Env org_number
+    Choose_Env channel_name
+    if [[ ! -z ${ANCHOR_PEERS} ]] ; then
+        export PEER_NUM=${ANCHOR_PEERS}
+        echo -e "\n these peers ${PEER_NUM} will act as anchor peer : ${CHANNEL_NAME} \n"
+    else
+        Choose_Env peer_number
+    fi
+
+    for Peer_No in ${PEER_NUM} ; do
+        export PEER_POD=$(kubectl get pods ${namespace_options} -l "app=hlf-peer,release=peer${Peer_No}-org${ORG_NUM}" -o jsonpath="{.items[0].metadata.name}")
+        Pod_Status_Wait ${PEER_POD}
+        echo "Connecting with Peer : peer${Peer_No}-org${ORG_NUM}on pod : ${PEER_POD}"
+        kubectl exec ${namespace_options} ${PEER_POD} -- rm -rf /Org${ORG_NUM}MSPanchors.tx
+        kubectl ${namespace_options} cp ${PROD_DIR}/config/Org${ORG_NUM}MSPanchors.tx ${PEER_POD}:/Org${ORG_NUM}MSPanchors.tx
+        echo -e "\n Anchor peer update on : peer${Peer_No}-org${ORG_NUM} \n"
+        echo "kubectl exec ${namespace_options} ${PEER_POD} -- bash -c 'CORE_PEER_MSPCONFIGPATH=\$ADMIN_MSP_PATH peer channel update -o ord1-hlf-ord.orderers.svc.cluster.local:7050 -c ${CHANNEL_NAME} -f /Org${ORG_NUM}MSPanchors.tx'" | bash
+        echo "===================== Anchor peers updated for org '${ORG_NUM}' on channel '${CHANNEL_NAME}' on peer peer${Peer_No}-org${ORG_NUM} ====================="
     done
 }
 
@@ -1056,6 +1115,23 @@ function List_Chaincode_Instantiate() {
 }
 
 
+#######################################
+## Configure connection json file for rest-api
+function Connection_Config_File() {
+
+    Get_CA_Info
+    if [[ ! -z ${CA_INGRESS} ]] ; then
+        echo "Configuring CA with Option :: ${CA_INGRESS}"
+        export CA_INGRESS="${CA_INGRESS}"
+        export P_W_D=${PWD} ; cd ${PROD_DIR}/extra/Rest-API-Conf
+        source ./ccp-generate.sh
+        cd ${P_W_D}
+    else
+        echo -e "\n task aborting.... \n"
+        exit 1
+    fi 
+
+}
 
 
 
@@ -1105,6 +1181,8 @@ elif [[ $option = channel-create ]]; then
     Create_Channel_On_Peer
 elif [[ $option = channel-join ]]; then
     Join_Channel
+elif [[ $option = anchor-config ]]; then
+    Update_AnchorPeers
 elif [[ $option = cc-deploy ]]; then
     CC_Version
     CC_Install
@@ -1135,6 +1213,7 @@ orderer-create      :   Create the Orderers certs and configure it in the K8s se
 peer-create         :   Create the Orderers certs and configure it in the K8s secrets, Deploying the Peers nodes on namespace peers
 channel-create      :   One time configuraiton on first peer (peer1-org1 / peer1-org2) on each organisation ; Creating the channel in one peer
 channel-join        :   Join to the channel which we created before
+anchor-config       :   update Anchor peer config
 cc-deploy           :   Install / Instantiate / Upgrade chaincode
 cc-delete           :   Delete the latest version of installed chaincode
 channel-ls          :   List all channels which a particular peer has joined

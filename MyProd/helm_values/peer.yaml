@@ -1,5 +1,5 @@
 image:
-  tag: 1.3.0
+  tag: "1.4.4"
 
 persistence:
   accessMode: ReadWriteOnce
@@ -20,6 +20,8 @@ peer:
   databaseType: CouchDB
   couchdbInstance: cdb-peer${PEER_NUM}-org${ORG_NUM}
   mspID: Org${ORG_NUM}MSP
+  gossip:
+    externalEndpoint: peer${PEER_NUM}-org${ORG_NUM}-hlf-peer.peers.svc.cluster.local:7051
 
 secrets:
   peer: 
