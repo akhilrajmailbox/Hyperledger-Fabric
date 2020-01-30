@@ -415,7 +415,3 @@ sudo chmod a+x /opt/kafka/bin/kafka-mytopic.sh
 cd /opt/kafka/bin/  ## update your zookeeper ip address in the script : kafka-mytopic.sh
 ./kafka-mytopic.sh -o [OPTION...]
 ```
-
-```
-./kafka-mytopic.sh -o [OPTION...]
-```
