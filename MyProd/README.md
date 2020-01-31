@@ -376,7 +376,9 @@ List all channels which a particular peer has joined.
 ./hlf.sh -o channel-ls
 ```
 
+## Configure `tlscerts` configuration
 
+[tlscerts](#https://github.com/Blockdaemon/fabric-ca/blob/gerrit-pr-29430/docs/source/operations_guide.rst)
 
 
 ## First Time Deployment :

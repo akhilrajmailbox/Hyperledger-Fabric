@@ -48,18 +48,24 @@ function CC_Provider() {
 ## helm and tiller
 function Helm_Configure() {
 
-    Setup_Namespace kube-system
-    echo "Configuring Helm in the k8s..!"
-    # kubectl create -f helm-rbac.yaml
-    kubectl create serviceaccount ${namespace_options} tiller
-    kubectl create clusterrolebinding tiller-cluster-rule --clusterrole=cluster-admin --serviceaccount=kube-system:tiller
-    helm init --service-account tiller
-    # kubectl patch deploy ${namespace_options} tiller-deploy -p '{"spec":{"template":{"spec":{"serviceAccount":"tiller"}}}}'
-    # helm init --service-account tiller --upgrade
-    TILLER_POD=$(kubectl ${namespace_options} get pods -l "name=tiller" -o jsonpath="{.items[0].metadata.name}")
-    Pod_Status_Wait ${TILLER_POD}
-    sleep 5
-    helm repo add ar-repo https://akhilrajmailbox.github.io/Hyperledger-Fabric/docs
+    # ## helm version 2.x.x depricated...!
+    # Setup_Namespace kube-system
+    # echo "Configuring Helm in the k8s..!"
+    # # kubectl create -f helm-rbac.yaml
+    # kubectl create serviceaccount ${namespace_options} tiller
+    # kubectl create clusterrolebinding tiller-cluster-rule --clusterrole=cluster-admin --serviceaccount=kube-system:tiller
+    # helm init --service-account tiller
+    # TILLER_POD=$(kubectl ${namespace_options} get pods -l "name=tiller" -o jsonpath="{.items[0].metadata.name}")
+    # Pod_Status_Wait ${TILLER_POD}
+    # sleep 5
+
+    if helm version | grep 'Version:"v3.' ; then
+        echo "helm version is 3.x.x"
+        helm repo add ar-repo https://akhilrajmailbox.github.io/Hyperledger-Fabric/docs
+    else
+        echo "please install helm version 3.x.x"
+        exit 1
+    fi
 }
 
 #######################################
@@ -119,7 +125,7 @@ function Nginx_Configure() {
 
     echo "Configure Ingress server for the deployment...!"
     Setup_Namespace ingress-controller
-    helm install stable/nginx-ingress -n nginx-ingress ${namespace_options}
+    helm install stable/nginx-ingress nginx-ingress ${namespace_options}
     Pod_Status_Wait
 }
 
@@ -191,8 +197,8 @@ function Cert_Manager_Configure() {
     kubectl apply --validate=false -f https://raw.githubusercontent.com/jetstack/cert-manager/release-0.12/deploy/manifests/00-crds.yaml
     helm repo add jetstack https://charts.jetstack.io
     sleep 3
-    # helm install stable/cert-manager -n cert-manager ${namespace_options}
-    helm install jetstack/cert-manager -n cert-manager ${namespace_options}
+    # helm install stable/cert-manager cert-manager ${namespace_options}
+    helm install jetstack/cert-manager cert-manager ${namespace_options}
     Pod_Status_Wait
     kubectl apply -f ${PROD_DIR}/extra/Cert-Manager/certManagerCI_staging.yaml
     kubectl apply -f ${PROD_DIR}/extra/Cert-Manager/certManagerCI_production.yaml
@@ -244,7 +250,7 @@ function Dind_Configure() {
 
     echo "Configure Dind server for the deployment...!"
     Setup_Namespace peers
-    helm install ar-repo/dind -n dindserver ${namespace_options} -f ${PROD_DIR}/helm_values/dind.yaml
+    helm install ar-repo/dind dindserver ${namespace_options} -f ${PROD_DIR}/helm_values/dind.yaml
     DIND_POD=$(kubectl ${namespace_options} get pods -l "app=dind" -o jsonpath="{.items[0].metadata.name}")
     Pod_Status_Wait ${DIND_POD}
 }
@@ -331,7 +337,7 @@ function Fabric_CA_Configure() {
     ## configuring namespace for fabric ca
     Setup_Namespace cas
 
-    helm install ar-repo/hlf-ca -n ca ${namespace_options} -f ${PROD_DIR}/helm_values/ca.yaml
+    helm install ar-repo/hlf-ca ca ${namespace_options} -f ${PROD_DIR}/helm_values/ca.yaml
     export CA_POD=$(kubectl get pods ${namespace_options} -l "app=hlf-ca,release=ca" -o jsonpath="{.items[0].metadata.name}")
 
     until kubectl logs ${namespace_options} ${CA_POD} | grep "Listening on" > /dev/null 2>&1 ; do
@@ -586,10 +592,11 @@ function Orderer_Conf() {
 
     Choose_Env order_number
     if [[ -d ${PROD_DIR}/config/ord${ORDERER_NUM}_MSP ]] ; then
+        Setup_Namespace orderers
         echo "ord${ORDERER_NUM} already configured...!"
         echo "Please move/rename the folder ${PROD_DIR}/config/ord${ORDERER_NUM}_MSP, then try to run this command again...!"
         echo ""
-        echo -e "Delete the helm chart deployment : \n helm del --purge ord${ORDERER_NUM} \nDelete the secrets also. \n kubectl -n orderers delete secrets hlf--ord${ORDERER_NUM}-idcert hlf--ord${ORDERER_NUM}-idkey"
+        echo -e "Delete the helm chart deployment : \n helm uninstall ${namespace_options} ord${ORDERER_NUM} \nDelete the secrets also. \n kubectl -n orderers delete secrets hlf--ord${ORDERER_NUM}-idcert hlf--ord${ORDERER_NUM}-idkey"
         echo ""
         Get_CA_Info
         echo -e "\n Checking the identity on CA...! \n"
@@ -633,7 +640,7 @@ function Orderer_Conf() {
 
             ## Install orderers using helm
             envsubst < ${PROD_DIR}/helm_values/ord.yaml > ${PROD_DIR}/config/MyConfig/ord${ORDERER_NUM}.yaml
-            helm install ar-repo/hlf-ord -n ord${ORDERER_NUM} ${namespace_options} -f ${PROD_DIR}/config/MyConfig/ord${ORDERER_NUM}.yaml
+            helm install ar-repo/hlf-ord ord${ORDERER_NUM} ${namespace_options} -f ${PROD_DIR}/config/MyConfig/ord${ORDERER_NUM}.yaml
 
             ## Get logs from orderer to check it's actually started
             export ORD_POD=$(kubectl get pods ${namespace_options} -l "app=hlf-ord,release=ord${ORDERER_NUM}" -o jsonpath="{.items[0].metadata.name}")
@@ -656,10 +663,11 @@ function Peer_Conf() {
     Choose_Env org_number
     Choose_Env peer_number
     if [[ -d ${PROD_DIR}/config/peer${PEER_NUM}-org${ORG_NUM}_MSP ]] ; then
+        Setup_Namespace peers
         echo "peer${PEER_NUM}-org${ORG_NUM} already configured...!"
         echo "Please move/rename the folder ${PROD_DIR}/config/peer${PEER_NUM}-org${ORG_NUM}_MSP, then try to run this command again...!"
         echo ""
-        echo -e "Delete the helm chart deployment : \n helm del --purge cdb-peer${PEER_NUM}-org${ORG_NUM} \n helm del --purge peer${PEER_NUM}-org${ORG_NUM} \nDelete the secrets also. \n kubectl -n peers delete secrets hlf--peer${PEER_NUM}-org${ORG_NUM}-idcert hlf--peer${PEER_NUM}-org${ORG_NUM}-idkey"
+        echo -e "Delete the helm chart deployment : \n helm uninstall ${namespace_options} cdb-peer${PEER_NUM}-org${ORG_NUM} \n helm uninstall ${namespace_options} peer${PEER_NUM}-org${ORG_NUM} \nDelete the secrets also. \n kubectl -n peers delete secrets hlf--peer${PEER_NUM}-org${ORG_NUM}-idcert hlf--peer${PEER_NUM}-org${ORG_NUM}-idkey"
         echo ""
         Get_CA_Info
         echo -e "\n Checking the identity on CA...! \n"
@@ -681,7 +689,7 @@ function Peer_Conf() {
         ## Install CouchDB chart
         Setup_Namespace peers
         envsubst < ${PROD_DIR}/helm_values/cdb-peer.yaml > ${PROD_DIR}/config/MyConfig/cdb-peer${PEER_NUM}-org${ORG_NUM}.yaml
-        helm install ar-repo/hlf-couchdb -n cdb-peer${PEER_NUM}-org${ORG_NUM} ${namespace_options} -f ${PROD_DIR}/config/MyConfig/cdb-peer${PEER_NUM}-org${ORG_NUM}.yaml
+        helm install ar-repo/hlf-couchdb cdb-peer${PEER_NUM}-org${ORG_NUM} ${namespace_options} -f ${PROD_DIR}/config/MyConfig/cdb-peer${PEER_NUM}-org${ORG_NUM}.yaml
 
         ## Check that CouchDB is running
         export CDB_POD=$(kubectl get pods ${namespace_options} -l "app=hlf-couchdb,release=cdb-peer${PEER_NUM}-org${ORG_NUM}" -o jsonpath="{.items[*].metadata.name}")
@@ -719,7 +727,7 @@ function Peer_Conf() {
 
             ## Install Peer using helm
             envsubst < ${PROD_DIR}/helm_values/peer.yaml > ${PROD_DIR}/config/MyConfig/peer${PEER_NUM}-org${ORG_NUM}.yaml
-            helm install ar-repo/hlf-peer -n peer${PEER_NUM}-org${ORG_NUM} ${namespace_options} -f ${PROD_DIR}/config/MyConfig/peer${PEER_NUM}-org${ORG_NUM}.yaml
+            helm install ar-repo/hlf-peer peer${PEER_NUM}-org${ORG_NUM} ${namespace_options} -f ${PROD_DIR}/config/MyConfig/peer${PEER_NUM}-org${ORG_NUM}.yaml
 
             ## check that Peer is running
             export PEER_POD=$(kubectl get pods ${namespace_options} -l "app=hlf-peer,release=peer${PEER_NUM}-org${ORG_NUM}" -o jsonpath="{.items[0].metadata.name}")
